@@ -1,5 +1,8 @@
 package com.example.ocreaite.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -19,22 +22,60 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.ocreaite.MainActivity
 import com.example.ocreaite.R
-import kotlinx.coroutines.delay
+import com.example.ocreaite.viewmodels.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignUpScreen(navController: NavController) {
+fun SignUpScreen(navController: NavController, activity: MainActivity?) {
+    val context = LocalContext.current
+    val viewModel = remember { AuthViewModel(context) }
+    val authState by viewModel.authState.collectAsState()
+
     var visible by remember { mutableStateOf(false) }
     var navigateBack by remember { mutableStateOf(false) }
 
+    // Launcher para Google Sign In
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val idToken = activity?.googleSignInHelper?.handleSignInResult(result.data)
+        if (idToken != null) {
+            viewModel.googleLogin(idToken)
+        } else {
+            Toast.makeText(context, "Google Sign In failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(Unit) {
         visible = true
+    }
+
+    // Observer para estado de autenticação
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Success -> {
+                val userName = (authState as AuthViewModel.AuthState.Success).userName
+                Toast.makeText(context, "Welcome, $userName!", Toast.LENGTH_SHORT).show()
+                viewModel.resetState()
+                navController.navigate("welcome/$userName") {
+                    popUpTo("splash1") { inclusive = true }
+                }
+            }
+            is AuthViewModel.AuthState.Error -> {
+                val message = (authState as AuthViewModel.AuthState.Error).message
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                viewModel.resetState()
+            }
+            else -> {}
+        }
     }
 
     // Observer para navegação de volta após animação
@@ -52,6 +93,18 @@ fun SignUpScreen(navController: NavController) {
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
     ) {
+        // Loading indicator
+        if (authState is AuthViewModel.AuthState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
         // TopBar com seta
         IconButton(
             onClick = {
@@ -77,7 +130,7 @@ fun SignUpScreen(navController: NavController) {
                 initialOffsetX = { it },
                 animationSpec = tween(250)
             ) + fadeIn(animationSpec = tween(250)),
-            exit = fadeOut(animationSpec = tween(0)) // Desaparece instantaneamente
+            exit = fadeOut(animationSpec = tween(0))
         ) {
             Column(
                 modifier = Modifier
@@ -132,7 +185,9 @@ fun SignUpScreen(navController: NavController) {
                     )
 
                     OutlinedButton(
-                        onClick = { /* Navegar para tela de registro com email */ },
+                        onClick = {
+                            navController.navigate("register/step1")
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
@@ -173,7 +228,14 @@ fun SignUpScreen(navController: NavController) {
                     )
 
                     Button(
-                        onClick = { /* Implementar registro com Google */ },
+                        onClick = {
+                            activity?.let {
+                                val signInIntent = it.googleSignInHelper.getSignInIntent()
+                                googleSignInLauncher.launch(signInIntent)
+                            } ?: run {
+                                Toast.makeText(context, "Google Sign In not available", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
