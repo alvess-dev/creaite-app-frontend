@@ -1,4 +1,3 @@
-// ==================== AppNavGraph.kt ====================
 package com.example.ocreaite.navigation
 
 import androidx.compose.runtime.Composable
@@ -34,7 +33,7 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
             SignUpScreen(navController, activity)
         }
 
-        // Auth screens - NEW (design atualizado)
+        // Auth screens
         composable("login") {
             LoginScreen(navController)
         }
@@ -78,13 +77,6 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
             AddItemsScreen(navController)
         }
 
-        // Welcome screen
-        composable("welcome/{nome}") { backStack ->
-            val nome = backStack.arguments?.getString("nome") ?: "Usuário"
-            WelcomeScreen(nome, navController)
-        }
-
-        // Placeholder routes (ainda não implementadas)
         composable("calendar") {
             // TODO: Implementar CalendarScreen
             WardrobeScreen(navController) // Temporário
@@ -97,6 +89,12 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
 
         composable("outfit") {
             StylingScreen(navController)
+        }
+
+        // Welcome screen (removido - não é mais necessário)
+        composable("welcome/{nome}") { backStack ->
+            val nome = backStack.arguments?.getString("nome") ?: "Usuário"
+            WelcomeScreen(nome, navController)
         }
     }
 }

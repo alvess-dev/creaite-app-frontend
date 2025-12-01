@@ -31,6 +31,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.ocreaite.viewmodels.AuthViewModel
 
 @Composable
 fun RegisterStep1Screen(navController: NavController) {
@@ -39,9 +40,32 @@ fun RegisterStep1Screen(navController: NavController) {
     var visible by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val viewModel = remember { AuthViewModel(context) }
+    val emailValidationState by viewModel.emailValidationState.collectAsState()
 
     LaunchedEffect(Unit) {
         visible = true
+    }
+
+    // Observar mudanças no estado de validação de email
+    LaunchedEffect(emailValidationState) {
+        when (emailValidationState) {
+            is AuthViewModel.EmailValidationState.Valid -> {
+                // Email válido, pode prosseguir
+                navController.currentBackStackEntry
+                    ?.savedStateHandle
+                    ?.set("email", email)
+                viewModel.resetEmailValidation()
+                visible = false
+                navController.navigate("register/step2")
+            }
+            is AuthViewModel.EmailValidationState.Invalid -> {
+                val message = (emailValidationState as AuthViewModel.EmailValidationState.Invalid).message
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                viewModel.resetEmailValidation()
+            }
+            else -> {}
+        }
     }
 
     Box(
@@ -49,6 +73,18 @@ fun RegisterStep1Screen(navController: NavController) {
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
     ) {
+        // Loading indicator
+        if (emailValidationState is AuthViewModel.EmailValidationState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
         AnimatedVisibility(
             visible = visible,
             enter = slideInHorizontally(
@@ -65,7 +101,7 @@ fun RegisterStep1Screen(navController: NavController) {
             ) {
                 // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
-                    targetValue = 0.2f, // 3/5
+                    targetValue = 0.2f,
                     animationSpec = tween(durationMillis = 600)
                 )
 
@@ -164,9 +200,7 @@ fun RegisterStep1Screen(navController: NavController) {
                             modifier = Modifier
                                 .size(20.dp)
                                 .background(
-                                    color = if (termsAccepted) Color(0xFF121212) else Color(
-                                        0xFFD9D9D9
-                                    ),
+                                    color = if (termsAccepted) Color(0xFF121212) else Color(0xFFD9D9D9),
                                     shape = CircleShape
                                 )
                                 .clickable(
@@ -250,18 +284,21 @@ fun RegisterStep1Screen(navController: NavController) {
 
                     Button(
                         onClick = {
-                            if (email.isNotBlank() && termsAccepted) {
-                                navController.currentBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("email", email)
-                                visible = false
-                                navController.navigate("register/step2")
-                            } else {
+                            if (email.isBlank()) {
                                 Toast.makeText(
                                     context,
-                                    "Please enter email and accept terms",
+                                    "Please enter your email",
                                     Toast.LENGTH_SHORT
                                 ).show()
+                            } else if (!termsAccepted) {
+                                Toast.makeText(
+                                    context,
+                                    "Please accept the terms and privacy policy",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                // Validar email no backend
+                                viewModel.validateEmail(email)
                             }
                         },
                         modifier = Modifier

@@ -1,5 +1,6 @@
 package com.example.ocreaite.screens
 
+import android.app.DatePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,10 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.ocreaite.viewmodels.AuthViewModel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 @Composable
 fun RegisterStep5Screen(navController: NavController) {
-    var birthDate by remember { mutableStateOf("Jul 14, 1995") }
+    var birthDate by remember { mutableStateOf<LocalDate?>(null) }
     var visible by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -53,6 +57,29 @@ fun RegisterStep5Screen(navController: NavController) {
         ?.savedStateHandle
         ?.get<String>("username") ?: ""
 
+    // Date Picker Dialog
+    val calendar = Calendar.getInstance()
+    calendar.set(1995, 6, 14) // Data padrão: Jul 14, 1995
+
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                birthDate = LocalDate.of(year, month + 1, dayOfMonth)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            // Define data máxima como hoje
+            datePicker.maxDate = System.currentTimeMillis()
+            // Define data mínima como 1900
+            val minCalendar = Calendar.getInstance()
+            minCalendar.set(1900, 0, 1)
+            datePicker.minDate = minCalendar.timeInMillis
+        }
+    }
+
     LaunchedEffect(Unit) {
         visible = true
     }
@@ -62,17 +89,19 @@ fun RegisterStep5Screen(navController: NavController) {
         when (authState) {
             is AuthViewModel.AuthState.Success -> {
                 val userName = (authState as AuthViewModel.AuthState.Success).userName
-                Toast.makeText(context, "Welcome, $userName!", Toast.LENGTH_SHORT).show()
                 viewModel.resetState()
-                navController.navigate("welcome/$userName") {
+                // Navega para a tela de interesses após cadastro
+                navController.navigate("interests") {
                     popUpTo("splash1") { inclusive = true }
                 }
             }
+
             is AuthViewModel.AuthState.Error -> {
                 val message = (authState as AuthViewModel.AuthState.Error).message
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 viewModel.resetState()
             }
+
             else -> {}
         }
     }
@@ -110,7 +139,7 @@ fun RegisterStep5Screen(navController: NavController) {
             ) {
                 // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
-                    targetValue = 1f, // 3/5
+                    targetValue = 1f,
                     animationSpec = tween(durationMillis = 600)
                 )
 
@@ -188,7 +217,7 @@ fun RegisterStep5Screen(navController: NavController) {
                                 indication = null,
                                 interactionSource = remember { MutableInteractionSource() }
                             ) {
-                                // Aqui você pode abrir um date picker real
+                                datePickerDialog.show()
                             }
                     ) {
                         Column(
@@ -200,10 +229,12 @@ fun RegisterStep5Screen(navController: NavController) {
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = birthDate,
+                                    text = birthDate?.format(
+                                        DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.ENGLISH)
+                                    ) ?: "Select date",
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF121212)
+                                    color = if (birthDate != null) Color(0xFF121212) else Color.Gray
                                 )
 
                                 Spacer(modifier = Modifier.width(16.dp))
@@ -254,14 +285,22 @@ fun RegisterStep5Screen(navController: NavController) {
 
                     Button(
                         onClick = {
-                            // Registrar usuário
-                            viewModel.register(
-                                email = email,
-                                password = password,
-                                username = username,
-                                name = name,
-                                birthDate = birthDate
-                            )
+                            if (birthDate != null) {
+                                // Registrar usuário com data de nascimento
+                                viewModel.register(
+                                    email = email,
+                                    password = password,
+                                    username = username,
+                                    name = name,
+                                    birthDate = birthDate.toString()
+                                )
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Please select your birth date",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()

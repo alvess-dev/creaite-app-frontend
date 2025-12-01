@@ -97,25 +97,15 @@ fun Interests(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header com seta
+                // Header com seta (opcional - pode remover se não quiser voltar)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp, start = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            visible = false
-                            navController.popBackStack()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Voltar",
-                            tint = Color(0xFF121212)
-                        )
-                    }
+                    // Removido botão de voltar para primeira vez
+                    Spacer(modifier = Modifier.height(48.dp))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -235,15 +225,14 @@ fun Interests(navController: NavController) {
                         Button(
                             onClick = {
                                 if (selectedInterests.isNotEmpty()) {
-                                    // Salvar interesses selecionados
-                                    navController.currentBackStackEntry
-                                        ?.savedStateHandle
-                                        ?.set("interests", selectedInterests.toList())
-                                    visible = false
-                                    // Navegar para próxima tela
+                                    // Navegar para guarda-roupa
+                                    navController.navigate("wardrobe") {
+                                        popUpTo("interests") { inclusive = true }
+                                    }
+                                } else {
                                     Toast.makeText(
                                         context,
-                                        "${selectedInterests.size} interests selected",
+                                        "Please select at least one interest",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
