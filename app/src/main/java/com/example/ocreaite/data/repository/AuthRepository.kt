@@ -149,20 +149,31 @@ class AuthRepository(private val tokenManager: TokenManager) {
         return try {
             Log.d(TAG, "=== Register Request ===")
             Log.d(TAG, "URL: $BASE_URL/auth/register")
-            Log.d(TAG, "Email: $email, Username: $username, Name: $name")
+
+            val requestBody = RegisterRequest(
+                email = email.trim().lowercase(),
+                password = password,
+                username = username.trim(),
+                name = name.trim(),
+                birthDate = birthDate,
+                language = "en"
+            )
+
+            Log.d(TAG, "Request Body:")
+            Log.d(TAG, "  email: '${requestBody.email}'")
+            Log.d(TAG, "  username: '${requestBody.username}'")
+            Log.d(TAG, "  name: '${requestBody.name}'")
+            Log.d(TAG, "  birthDate: '${requestBody.birthDate}'")
+            Log.d(TAG, "  language: '${requestBody.language}'")
+            Log.d(TAG, "  password length: ${requestBody.password.length}")
 
             val response: AuthResponse = client.post("$BASE_URL/auth/register") {
                 contentType(ContentType.Application.Json)
-                setBody(RegisterRequest(
-                    email.trim().lowercase(),
-                    password,
-                    username,
-                    name,
-                    birthDate
-                ))
+                setBody(requestBody)
             }.body()
 
             Log.d(TAG, "✅ Register successful")
+            Log.d(TAG, "User: ${response.name}")
 
             tokenManager.saveToken(response.token)
             AuthResult.Success(response)

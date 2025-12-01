@@ -18,11 +18,30 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         buildConfigField(
             "String",
             "GOOGLE_CLIENT_ID",
             "\"${project.properties["GOOGLE_CLIENT_ID"]}\""
         )
+    }
+
+    // ================================
+    //   DESUGARING (LocalDate API 26-)
+    // ================================
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -34,29 +53,23 @@ android {
             )
         }
     }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
 }
 
 dependencies {
+
+    // ==========================
+    //   DESUGARING (OBRIGATÓRIO)
+    // ==========================
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+
+    // Coil para imagens
     implementation("io.coil-kt:coil-compose:2.5.0")
 
-    // Kotlinx Serialization (OBRIGATÓRIO para Ktor)
+    // Kotlinx Serialization (para Ktor)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
-    // Ktor para requisições HTTP
+    // Ktor (HTTP client)
     implementation("io.ktor:ktor-client-core:2.3.7")
     implementation("io.ktor:ktor-client-cio:2.3.7")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
@@ -70,34 +83,33 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
-    // Compose BOM (gerencia versões automaticamente)
+    // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
-    // Compose adicional
+    // Compose extra
     implementation("androidx.compose.ui:ui:1.7.5")
     implementation("androidx.compose.material3:material3:1.3.1")
     implementation("androidx.compose.foundation:foundation:1.7.5")
     implementation("androidx.compose.animation:animation:1.7.5")
 
-    // Navigation
+    // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.8.4")
 
-    // Coil para carregar imagens
-    implementation("io.coil-kt:coil-compose:2.5.0")
-
-    // DataStore (Token Storage)
+    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // ViewModel
+    // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+    // CameraX
     implementation(libs.androidx.camera.camera2.pipe)
     implementation(libs.androidx.compose.foundation)
 

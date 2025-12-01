@@ -52,6 +52,7 @@ fun WardrobeScreen(navController: NavController) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
+    var showOnlyFavorites by remember { mutableStateOf(false) }
 
     var clothingItems by remember {
         mutableStateOf(
@@ -106,12 +107,13 @@ fun WardrobeScreen(navController: NavController) {
         clothingItems.map { it.category }.distinct()
     }
 
-    val filteredItems = remember(selectedCategory, searchText, clothingItems) {
+    val filteredItems = remember(selectedCategory, searchText, clothingItems, showOnlyFavorites) {
         clothingItems.filter { item ->
             val matchesCategory = selectedCategory == null || item.category == selectedCategory
             val matchesSearch = searchText.isEmpty() ||
                     item.name.contains(searchText, ignoreCase = true)
-            matchesCategory && matchesSearch
+            val matchesFavorite = !showOnlyFavorites || item.isFavorite
+            matchesCategory && matchesSearch && matchesFavorite
         }
     }
 
@@ -238,19 +240,23 @@ fun WardrobeScreen(navController: NavController) {
                         }
 
                         IconButton(
-                            onClick = { /* TODO: Show favorites */ },
+                            onClick = { showOnlyFavorites = !showOnlyFavorites },
                             modifier = Modifier
                                 .size(52.dp)
                                 .border(
                                     width = 1.dp,
-                                    color = Color(0xFFD9D9D9),
+                                    color = if (showOnlyFavorites) Color(0xFF121212) else Color(0xFFD9D9D9),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .background(
+                                    color = if (showOnlyFavorites) Color(0xFF121212) else Color.Transparent,
                                     shape = RoundedCornerShape(8.dp)
                                 )
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FavoriteBorder,
+                                imageVector = if (showOnlyFavorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Favorites",
-                                tint = Color(0xFF121212)
+                                tint = if (showOnlyFavorites) Color.White else Color(0xFF121212)
                             )
                         }
                     }
@@ -270,7 +276,7 @@ fun WardrobeScreen(navController: NavController) {
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Start styling",
+                                text = if (showOnlyFavorites) "No favorites yet" else "Start styling",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF000000)

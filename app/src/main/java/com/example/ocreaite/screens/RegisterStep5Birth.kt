@@ -1,18 +1,17 @@
 package com.example.ocreaite.screens
 
 import android.app.DatePickerDialog
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -43,23 +42,18 @@ fun RegisterStep5Screen(navController: NavController) {
     val viewModel = remember { AuthViewModel(context) }
     val authState by viewModel.authState.collectAsState()
 
-    // Recuperar dados das etapas anteriores
-    val email = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>("email") ?: ""
-    val name = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>("name") ?: ""
-    val password = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>("password") ?: ""
-    val username = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>("username") ?: ""
+    // 🔥 CRUCIAL: Pegar dados do savedStateHandle da Step1!
+    val step1Entry = navController.getBackStackEntry("register/step1")
+    val savedStateHandle = step1Entry.savedStateHandle
+
+    val email = savedStateHandle.get<String>("email") ?: ""
+    val name = savedStateHandle.get<String>("name") ?: ""
+    val password = savedStateHandle.get<String>("password") ?: ""
+    val username = savedStateHandle.get<String>("username") ?: ""
 
     // Date Picker Dialog
     val calendar = Calendar.getInstance()
-    calendar.set(1995, 6, 14) // Data padrão: Jul 14, 1995
+    calendar.set(1995, 6, 14)
 
     val datePickerDialog = remember {
         DatePickerDialog(
@@ -71,9 +65,7 @@ fun RegisterStep5Screen(navController: NavController) {
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            // Define data máxima como hoje
             datePicker.maxDate = System.currentTimeMillis()
-            // Define data mínima como 1900
             val minCalendar = Calendar.getInstance()
             minCalendar.set(1900, 0, 1)
             datePicker.minDate = minCalendar.timeInMillis
@@ -82,6 +74,13 @@ fun RegisterStep5Screen(navController: NavController) {
 
     LaunchedEffect(Unit) {
         visible = true
+
+        // Log dos dados recuperados
+        Log.d("RegisterStep5", "=== Data Retrieved from Step1 ===")
+        Log.d("RegisterStep5", "email: '$email'")
+        Log.d("RegisterStep5", "name: '$name'")
+        Log.d("RegisterStep5", "password length: ${password.length}")
+        Log.d("RegisterStep5", "username: '$username'")
     }
 
     // Observer para estado de autenticação
@@ -90,7 +89,6 @@ fun RegisterStep5Screen(navController: NavController) {
             is AuthViewModel.AuthState.Success -> {
                 val userName = (authState as AuthViewModel.AuthState.Success).userName
                 viewModel.resetState()
-                // Navega para a tela de interesses após cadastro
                 navController.navigate("interests") {
                     popUpTo("splash1") { inclusive = true }
                 }
@@ -137,7 +135,6 @@ fun RegisterStep5Screen(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 600)
@@ -157,7 +154,6 @@ fun RegisterStep5Screen(navController: NavController) {
                     )
                 }
 
-                // Header com seta
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,7 +176,6 @@ fun RegisterStep5Screen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Conteúdo
                 Column(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
@@ -203,13 +198,10 @@ fun RegisterStep5Screen(navController: NavController) {
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF121212)
                         )
-
-                        Spacer(modifier = Modifier.width(4.dp))
                     }
 
                     Spacer(modifier = Modifier.height(60.dp))
 
-                    // Date picker visual
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -272,7 +264,6 @@ fun RegisterStep5Screen(navController: NavController) {
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Botão Next e Skip for now
                 Column(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
@@ -285,8 +276,31 @@ fun RegisterStep5Screen(navController: NavController) {
 
                     Button(
                         onClick = {
+                            // Validar dados antes de enviar
+                            if (email.isBlank()) {
+                                Toast.makeText(context, "Email is missing. Please start over.", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+                            if (name.isBlank()) {
+                                Toast.makeText(context, "Name is missing. Please start over.", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+                            if (password.isBlank()) {
+                                Toast.makeText(context, "Password is missing. Please start over.", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+                            if (username.isBlank()) {
+                                Toast.makeText(context, "Username is missing. Please start over.", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+
                             if (birthDate != null) {
-                                // Registrar usuário com data de nascimento
+                                Log.d("RegisterStep5", "=== Calling register ===")
+                                Log.d("RegisterStep5", "email: '$email'")
+                                Log.d("RegisterStep5", "name: '$name'")
+                                Log.d("RegisterStep5", "username: '$username'")
+                                Log.d("RegisterStep5", "birthDate: '${birthDate.toString()}'")
+
                                 viewModel.register(
                                     email = email,
                                     password = password,
@@ -355,7 +369,18 @@ fun RegisterStep5Screen(navController: NavController) {
                                         val released = tryAwaitRelease()
                                         isSkipPressed = false
                                         if (released) {
-                                            // Registrar sem data de nascimento
+                                            // Validar dados antes de enviar
+                                            if (email.isBlank() || name.isBlank() ||
+                                                password.isBlank() || username.isBlank()) {
+                                                return@detectTapGestures
+                                            }
+
+                                            Log.d("RegisterStep5", "=== Calling register (skip) ===")
+                                            Log.d("RegisterStep5", "email: '$email'")
+                                            Log.d("RegisterStep5", "name: '$name'")
+                                            Log.d("RegisterStep5", "username: '$username'")
+                                            Log.d("RegisterStep5", "birthDate: null")
+
                                             viewModel.register(
                                                 email = email,
                                                 password = password,

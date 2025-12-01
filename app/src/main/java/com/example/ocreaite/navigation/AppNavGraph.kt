@@ -13,7 +13,7 @@ import com.example.ocreaite.screens.*
 fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null) {
     NavHost(
         navController = navController,
-        startDestination = "splash1"
+        startDestination = "ai" // Mudado para teste
     ) {
         // Splash screens
         composable("splash1") {
@@ -83,15 +83,14 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
         }
 
         composable("ai") {
-            // TODO: Implementar AIScreen
-            WardrobeScreen(navController) // Temporário
+            AIAssistantScreen(navController)
         }
 
         composable("outfit") {
             StylingScreen(navController)
         }
 
-        // Welcome screen (removido - não é mais necessário)
+        // Welcome screen
         composable("welcome/{nome}") { backStack ->
             val nome = backStack.arguments?.getString("nome") ?: "Usuário"
             WelcomeScreen(nome, navController)

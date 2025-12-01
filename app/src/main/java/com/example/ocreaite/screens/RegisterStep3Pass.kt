@@ -1,21 +1,19 @@
 package com.example.ocreaite.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,8 +30,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 
 @Composable
@@ -44,7 +40,10 @@ fun RegisterStep3Screen(navController: NavController) {
 
     val context = LocalContext.current
 
-    // Calcular força da senha
+    // Pegar savedStateHandle da Step1
+    val step1Entry = navController.getBackStackEntry("register/step1")
+    val savedStateHandle = step1Entry.savedStateHandle
+
     val passwordStrength = remember(password) {
         when {
             password.isEmpty() -> 0
@@ -58,10 +57,10 @@ fun RegisterStep3Screen(navController: NavController) {
     }
 
     val strengthColor = when (passwordStrength) {
-        1 -> Color(0xFFFF6B6B) // Vermelho
-        2 -> Color(0xFFFFD93D) // Amarelo
-        3 -> Color(0xFF6BCF7F) // Verde
-        else -> Color(0xFFD9D9D9) // Cinza (vazio)
+        1 -> Color(0xFFFF6B6B)
+        2 -> Color(0xFFFFD93D)
+        3 -> Color(0xFF6BCF7F)
+        else -> Color(0xFFD9D9D9)
     }
 
     val strengthProgress = when (passwordStrength) {
@@ -99,9 +98,8 @@ fun RegisterStep3Screen(navController: NavController) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Barra de progresso no topo (tela inteira)
                     val animatedTopProgress by animateFloatAsState(
-                        targetValue = 0.6f, // 3/5
+                        targetValue = 0.6f,
                         animationSpec = tween(durationMillis = 600)
                     )
 
@@ -119,7 +117,6 @@ fun RegisterStep3Screen(navController: NavController) {
                         )
                     }
 
-                    // Header com seta
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -142,7 +139,6 @@ fun RegisterStep3Screen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Conteúdo
                     Column(
                         modifier = Modifier.padding(horizontal = 32.dp)
                     ) {
@@ -191,7 +187,6 @@ fun RegisterStep3Screen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Barra de força da senha
                         val animatedProgress by animateFloatAsState(
                             targetValue = strengthProgress,
                             animationSpec = tween(durationMillis = 400)
@@ -213,7 +208,6 @@ fun RegisterStep3Screen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Texto de instrução
                         Text(
                             text = buildAnnotatedString {
                                 withStyle(
@@ -240,7 +234,6 @@ fun RegisterStep3Screen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Password tips com ícone
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -256,13 +249,10 @@ fun RegisterStep3Screen(navController: NavController) {
                                     fontWeight = FontWeight.Medium
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(6.dp))
                         }
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // Botão Next
                         val buttonInteractionSource = remember { MutableInteractionSource() }
                         val isButtonPressed by buttonInteractionSource.collectIsPressedAsState()
                         val buttonScale by animateFloatAsState(
@@ -273,9 +263,10 @@ fun RegisterStep3Screen(navController: NavController) {
                         Button(
                             onClick = {
                                 if (password.length >= 8) {
-                                    navController.currentBackStackEntry
-                                        ?.savedStateHandle
-                                        ?.set("password", password)
+                                    // Salvar no savedStateHandle da Step1
+                                    savedStateHandle.set("password", password)
+                                    Log.d("RegisterStep3", "✅ Password saved (length: ${password.length})")
+
                                     visible = false
                                     navController.navigate("register/step4")
                                 } else {
@@ -312,7 +303,6 @@ fun RegisterStep3Screen(navController: NavController) {
             }
         }
 
-        // Dialog de Password Tips
         if (showPasswordTips) {
             Box(
                 modifier = Modifier
@@ -320,7 +310,6 @@ fun RegisterStep3Screen(navController: NavController) {
                     .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                // Área clicável para fechar
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -332,14 +321,13 @@ fun RegisterStep3Screen(navController: NavController) {
                         }
                 )
 
-                // Popup que não fecha ao clicar nele
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
-                        ) { /* Não faz nada - previne o clique de passar */ },
+                        ) { },
                     color = Color(0xFF121212),
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     shadowElevation = 8.dp

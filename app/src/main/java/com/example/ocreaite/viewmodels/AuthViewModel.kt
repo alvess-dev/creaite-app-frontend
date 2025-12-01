@@ -1,6 +1,7 @@
 package com.example.ocreaite.viewmodels
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ocreaite.data.local.TokenManager
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 
 class AuthViewModel(context: Context) : ViewModel() {
 
+    private val TAG = "AuthViewModel"
     private val tokenManager = TokenManager(context)
     private val repository = AuthRepository(tokenManager)
 
@@ -116,12 +118,22 @@ class AuthViewModel(context: Context) : ViewModel() {
         birthDate: String?
     ) {
         viewModelScope.launch {
+            Log.d(TAG, "=== Register Called ===")
+            Log.d(TAG, "email: '$email'")
+            Log.d(TAG, "password length: ${password.length}")
+            Log.d(TAG, "username: '$username'")
+            Log.d(TAG, "name: '$name'")
+            Log.d(TAG, "birthDate: '$birthDate'")
+
             _authState.value = AuthState.Loading
+
             when (val result = repository.register(email, password, username, name, birthDate)) {
                 is AuthRepository.AuthResult.Success -> {
+                    Log.d(TAG, "✅ Register success in ViewModel")
                     _authState.value = AuthState.Success(result.response.name)
                 }
                 is AuthRepository.AuthResult.Error -> {
+                    Log.e(TAG, "❌ Register error in ViewModel: ${result.message}")
                     _authState.value = AuthState.Error(result.message)
                 }
             }

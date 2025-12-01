@@ -1,5 +1,6 @@
 package com.example.ocreaite.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -30,6 +31,10 @@ fun RegisterStep2Screen(navController: NavController) {
 
     val context = LocalContext.current
 
+    // Pegar savedStateHandle da Step1
+    val step1Entry = navController.getBackStackEntry("register/step1")
+    val savedStateHandle = step1Entry.savedStateHandle
+
     LaunchedEffect(Unit) {
         visible = true
     }
@@ -53,9 +58,8 @@ fun RegisterStep2Screen(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
-                    targetValue = 0.4f, // 3/5
+                    targetValue = 0.4f,
                     animationSpec = tween(durationMillis = 600)
                 )
 
@@ -73,7 +77,6 @@ fun RegisterStep2Screen(navController: NavController) {
                     )
                 }
 
-                // Header com seta
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -96,7 +99,6 @@ fun RegisterStep2Screen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Conteúdo
                 Column(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
@@ -141,7 +143,6 @@ fun RegisterStep2Screen(navController: NavController) {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Botão Next
                     val buttonInteractionSource = remember { MutableInteractionSource() }
                     val isButtonPressed by buttonInteractionSource.collectIsPressedAsState()
                     val buttonScale by animateFloatAsState(
@@ -152,9 +153,10 @@ fun RegisterStep2Screen(navController: NavController) {
                     Button(
                         onClick = {
                             if (name.isNotBlank()) {
-                                navController.currentBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("name", name)
+                                // Salvar no savedStateHandle da Step1
+                                savedStateHandle.set("name", name)
+                                Log.d("RegisterStep2", "✅ Name saved: '$name'")
+
                                 visible = false
                                 navController.navigate("register/step3")
                             } else {

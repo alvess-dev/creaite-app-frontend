@@ -1,5 +1,6 @@
 package com.example.ocreaite.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,30 +24,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.ocreaite.viewmodels.AuthViewModel
-import kotlinx.coroutines.delay
 
 @Composable
 fun RegisterStep4Screen(navController: NavController) {
     var username by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    var isCheckingUsername by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val viewModel = remember { AuthViewModel(context) }
     val usernameValidationState by viewModel.usernameValidationState.collectAsState()
 
+    // Pegar savedStateHandle da Step1
+    val step1Entry = navController.getBackStackEntry("register/step1")
+    val savedStateHandle = step1Entry.savedStateHandle
+
     LaunchedEffect(Unit) {
         visible = true
     }
 
-    // Observer para validação de username
     LaunchedEffect(usernameValidationState) {
         when (usernameValidationState) {
             is AuthViewModel.UsernameValidationState.Valid -> {
-                // Username válido, navegar para próxima etapa
-                navController.currentBackStackEntry
-                    ?.savedStateHandle
-                    ?.set("username", username)
+                // Salvar no savedStateHandle da Step1
+                savedStateHandle.set("username", username)
+                Log.d("RegisterStep4", "✅ Username saved: '$username'")
+
                 viewModel.resetUsernameValidation()
                 visible = false
                 navController.navigate("register/step5")
@@ -65,7 +67,6 @@ fun RegisterStep4Screen(navController: NavController) {
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
     ) {
-        // Loading indicator
         if (usernameValidationState is AuthViewModel.UsernameValidationState.Loading) {
             Box(
                 modifier = Modifier
@@ -91,7 +92,6 @@ fun RegisterStep4Screen(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
                     targetValue = 0.8f,
                     animationSpec = tween(durationMillis = 600)
@@ -111,7 +111,6 @@ fun RegisterStep4Screen(navController: NavController) {
                     )
                 }
 
-                // Header com seta
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -134,7 +133,6 @@ fun RegisterStep4Screen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Conteúdo
                 Column(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
@@ -188,7 +186,6 @@ fun RegisterStep4Screen(navController: NavController) {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Botão Next
                     val buttonInteractionSource = remember { MutableInteractionSource() }
                     val isButtonPressed by buttonInteractionSource.collectIsPressedAsState()
                     val buttonScale by animateFloatAsState(
@@ -205,7 +202,6 @@ fun RegisterStep4Screen(navController: NavController) {
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } else {
-                                // Validar username no backend
                                 viewModel.validateUsername(username)
                             }
                         },

@@ -1,5 +1,6 @@
 package com.example.ocreaite.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,7 +12,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.ocreaite.viewmodels.AuthViewModel
+import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
 fun RegisterStep1Screen(navController: NavController) {
@@ -43,18 +44,20 @@ fun RegisterStep1Screen(navController: NavController) {
     val viewModel = remember { AuthViewModel(context) }
     val emailValidationState by viewModel.emailValidationState.collectAsState()
 
+    // Pegar referência ao savedStateHandle DESTA tela
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+
     LaunchedEffect(Unit) {
         visible = true
     }
 
-    // Observar mudanças no estado de validação de email
     LaunchedEffect(emailValidationState) {
         when (emailValidationState) {
             is AuthViewModel.EmailValidationState.Valid -> {
-                // Email válido, pode prosseguir
-                navController.currentBackStackEntry
-                    ?.savedStateHandle
-                    ?.set("email", email)
+                // Salvar email no savedStateHandle DESTA tela (step1)
+                savedStateHandle?.set("email", email)
+                Log.d("RegisterStep1", "✅ Email saved: '$email'")
+
                 viewModel.resetEmailValidation()
                 visible = false
                 navController.navigate("register/step2")
@@ -73,7 +76,6 @@ fun RegisterStep1Screen(navController: NavController) {
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
     ) {
-        // Loading indicator
         if (emailValidationState is AuthViewModel.EmailValidationState.Loading) {
             Box(
                 modifier = Modifier
@@ -99,7 +101,6 @@ fun RegisterStep1Screen(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
                     targetValue = 0.2f,
                     animationSpec = tween(durationMillis = 600)
@@ -119,7 +120,6 @@ fun RegisterStep1Screen(navController: NavController) {
                     )
                 }
 
-                // Header com seta
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -142,7 +142,6 @@ fun RegisterStep1Screen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Conteúdo
                 Column(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
@@ -190,12 +189,10 @@ fun RegisterStep1Screen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Checkbox customizado e texto
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Checkbox customizado
                         Box(
                             modifier = Modifier
                                 .size(20.dp)
@@ -227,7 +224,6 @@ fun RegisterStep1Screen(navController: NavController) {
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        // Texto com "terms" e "privacy policy" em negrito e sublinhado
                         Text(
                             text = buildAnnotatedString {
                                 withStyle(
@@ -274,7 +270,6 @@ fun RegisterStep1Screen(navController: NavController) {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Botão Next
                     val buttonInteractionSource = remember { MutableInteractionSource() }
                     val isButtonPressed by buttonInteractionSource.collectIsPressedAsState()
                     val buttonScale by animateFloatAsState(
@@ -297,7 +292,6 @@ fun RegisterStep1Screen(navController: NavController) {
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } else {
-                                // Validar email no backend
                                 viewModel.validateEmail(email)
                             }
                         },
