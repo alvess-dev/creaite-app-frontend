@@ -20,6 +20,9 @@ class AuthViewModel(context: Context) : ViewModel() {
     private val _emailValidationState = MutableStateFlow<EmailValidationState>(EmailValidationState.Idle)
     val emailValidationState: StateFlow<EmailValidationState> = _emailValidationState
 
+    private val _usernameValidationState = MutableStateFlow<UsernameValidationState>(UsernameValidationState.Idle)
+    val usernameValidationState: StateFlow<UsernameValidationState> = _usernameValidationState
+
     sealed class AuthState {
         object Idle : AuthState()
         object Loading : AuthState()
@@ -32,6 +35,13 @@ class AuthViewModel(context: Context) : ViewModel() {
         object Loading : EmailValidationState()
         object Valid : EmailValidationState()
         data class Invalid(val message: String) : EmailValidationState()
+    }
+
+    sealed class UsernameValidationState {
+        object Idle : UsernameValidationState()
+        object Loading : UsernameValidationState()
+        object Valid : UsernameValidationState()
+        data class Invalid(val message: String) : UsernameValidationState()
     }
 
     fun validateEmail(email: String) {
@@ -54,6 +64,31 @@ class AuthViewModel(context: Context) : ViewModel() {
                 }
                 is AuthRepository.EmailCheckResult.Error -> {
                     _emailValidationState.value = EmailValidationState.Invalid(result.message)
+                }
+            }
+        }
+    }
+
+    fun validateUsername(username: String) {
+        viewModelScope.launch {
+            _usernameValidationState.value = UsernameValidationState.Loading
+
+            // Validação básica
+            if (username.length < 3) {
+                _usernameValidationState.value = UsernameValidationState.Invalid("Username must be at least 3 characters")
+                return@launch
+            }
+
+            // Verifica se o username já existe no backend
+            when (val result = repository.checkUsernameExists(username)) {
+                is AuthRepository.UsernameCheckResult.Available -> {
+                    _usernameValidationState.value = UsernameValidationState.Valid
+                }
+                is AuthRepository.UsernameCheckResult.Taken -> {
+                    _usernameValidationState.value = UsernameValidationState.Invalid("Username already taken")
+                }
+                is AuthRepository.UsernameCheckResult.Error -> {
+                    _usernameValidationState.value = UsernameValidationState.Invalid(result.message)
                 }
             }
         }
@@ -113,5 +148,9 @@ class AuthViewModel(context: Context) : ViewModel() {
 
     fun resetEmailValidation() {
         _emailValidationState.value = EmailValidationState.Idle
+    }
+
+    fun resetUsernameValidation() {
+        _usernameValidationState.value = UsernameValidationState.Idle
     }
 }

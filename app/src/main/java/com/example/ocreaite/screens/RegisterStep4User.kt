@@ -22,16 +22,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.ocreaite.viewmodels.AuthViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun RegisterStep4Screen(navController: NavController) {
     var username by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
+    var isCheckingUsername by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val viewModel = remember { AuthViewModel(context) }
+    val usernameValidationState by viewModel.usernameValidationState.collectAsState()
 
     LaunchedEffect(Unit) {
         visible = true
+    }
+
+    // Observer para validação de username
+    LaunchedEffect(usernameValidationState) {
+        when (usernameValidationState) {
+            is AuthViewModel.UsernameValidationState.Valid -> {
+                // Username válido, navegar para próxima etapa
+                navController.currentBackStackEntry
+                    ?.savedStateHandle
+                    ?.set("username", username)
+                viewModel.resetUsernameValidation()
+                visible = false
+                navController.navigate("register/step5")
+            }
+            is AuthViewModel.UsernameValidationState.Invalid -> {
+                val message = (usernameValidationState as AuthViewModel.UsernameValidationState.Invalid).message
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                viewModel.resetUsernameValidation()
+            }
+            else -> {}
+        }
     }
 
     Box(
@@ -39,6 +65,18 @@ fun RegisterStep4Screen(navController: NavController) {
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
     ) {
+        // Loading indicator
+        if (usernameValidationState is AuthViewModel.UsernameValidationState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
         AnimatedVisibility(
             visible = visible,
             enter = slideInHorizontally(
@@ -55,7 +93,7 @@ fun RegisterStep4Screen(navController: NavController) {
             ) {
                 // Barra de progresso no topo (tela inteira)
                 val animatedTopProgress by animateFloatAsState(
-                    targetValue = 0.8f, // 3/5
+                    targetValue = 0.8f,
                     animationSpec = tween(durationMillis = 600)
                 )
 
@@ -160,18 +198,15 @@ fun RegisterStep4Screen(navController: NavController) {
 
                     Button(
                         onClick = {
-                            if (username.isNotBlank()) {
-                                navController.currentBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("username", username)
-                                visible = false
-                                navController.navigate("register/step5")
-                            } else {
+                            if (username.isBlank()) {
                                 Toast.makeText(
                                     context,
                                     "Please enter a username",
                                     Toast.LENGTH_SHORT
                                 ).show()
+                            } else {
+                                // Validar username no backend
+                                viewModel.validateUsername(username)
                             }
                         },
                         modifier = Modifier

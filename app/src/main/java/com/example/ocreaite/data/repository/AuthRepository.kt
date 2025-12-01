@@ -15,14 +15,19 @@ import kotlinx.serialization.json.Json
 class AuthRepository(private val tokenManager: TokenManager) {
 
     private val TAG = "AuthRepository"
-    private val BASE_URL = "http://192.168.68.107:8080"
+    private val BASE_URL = "http://192.168.68.107:8080" // 🔴 ALTERE PARA SEU IP
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
                 isLenient = true
+                prettyPrint = true
             })
+        }
+
+        engine {
+            requestTimeout = 30_000
         }
     }
 
@@ -37,6 +42,12 @@ class AuthRepository(private val tokenManager: TokenManager) {
         data class Error(val message: String) : EmailCheckResult()
     }
 
+    sealed class UsernameCheckResult {
+        object Available : UsernameCheckResult()
+        object Taken : UsernameCheckResult()
+        data class Error(val message: String) : UsernameCheckResult()
+    }
+
     suspend fun checkEmailExists(email: String): EmailCheckResult {
         return try {
             Log.d(TAG, "=== Checking Email ===")
@@ -45,6 +56,7 @@ class AuthRepository(private val tokenManager: TokenManager) {
 
             val response = client.get("$BASE_URL/auth/check-email") {
                 parameter("email", email.trim().lowercase())
+                contentType(ContentType.Application.Json)
             }
 
             Log.d(TAG, "Response status: ${response.status}")
@@ -60,13 +72,47 @@ class AuthRepository(private val tokenManager: TokenManager) {
                 }
                 else -> {
                     Log.e(TAG, "❌ Unexpected status: ${response.status}")
-                    EmailCheckResult.Error("Error checking email")
+                    EmailCheckResult.Error("Error checking email: ${response.status}")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Email check failed: ${e.message}")
             Log.e(TAG, "Stack trace: ${e.stackTraceToString()}")
             EmailCheckResult.Error(e.message ?: "Email check failed")
+        }
+    }
+
+    suspend fun checkUsernameExists(username: String): UsernameCheckResult {
+        return try {
+            Log.d(TAG, "=== Checking Username ===")
+            Log.d(TAG, "URL: $BASE_URL/auth/check-username")
+            Log.d(TAG, "Username: $username")
+
+            val response = client.get("$BASE_URL/auth/check-username") {
+                parameter("username", username.trim())
+                contentType(ContentType.Application.Json)
+            }
+
+            Log.d(TAG, "Response status: ${response.status}")
+
+            when (response.status) {
+                HttpStatusCode.OK -> {
+                    Log.d(TAG, "✅ Username available")
+                    UsernameCheckResult.Available
+                }
+                HttpStatusCode.Conflict -> {
+                    Log.d(TAG, "❌ Username already taken")
+                    UsernameCheckResult.Taken
+                }
+                else -> {
+                    Log.e(TAG, "❌ Unexpected status: ${response.status}")
+                    UsernameCheckResult.Error("Error checking username: ${response.status}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Username check failed: ${e.message}")
+            Log.e(TAG, "Stack trace: ${e.stackTraceToString()}")
+            UsernameCheckResult.Error(e.message ?: "Username check failed")
         }
     }
 
@@ -103,7 +149,7 @@ class AuthRepository(private val tokenManager: TokenManager) {
         return try {
             Log.d(TAG, "=== Register Request ===")
             Log.d(TAG, "URL: $BASE_URL/auth/register")
-            Log.d(TAG, "Email: $email, Username: $username")
+            Log.d(TAG, "Email: $email, Username: $username, Name: $name")
 
             val response: AuthResponse = client.post("$BASE_URL/auth/register") {
                 contentType(ContentType.Application.Json)
@@ -122,6 +168,7 @@ class AuthRepository(private val tokenManager: TokenManager) {
             AuthResult.Success(response)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Register failed: ${e.message}")
+            Log.e(TAG, "Stack trace: ${e.stackTraceToString()}")
             AuthResult.Error(e.message ?: "Registration failed")
         }
     }
