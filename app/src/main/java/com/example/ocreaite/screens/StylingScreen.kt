@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/ocreaite/screens/StylingScreen.kt
 package com.example.ocreaite.screens
 
 import androidx.compose.animation.*
@@ -24,14 +25,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.ocreaite.R
+import com.example.ocreaite.data.models.ClothingItem
+import com.example.ocreaite.viewmodels.WardrobeViewModel
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
@@ -44,52 +49,87 @@ data class OutfitRow(
 
 @Composable
 fun StylingScreen(navController: NavController) {
+    val context = LocalContext.current
+    val viewModel = remember { WardrobeViewModel(context) }
+    val clothesState by viewModel.clothesState.collectAsState()
+
     var numberOfRows by remember { mutableStateOf(3) }
     var visible by remember { mutableStateOf(false) }
 
-    // Sample clothing items for each row
-    val availableItems = remember {
-        listOf(
-            ClothingItem(1, "Gray T-Shirt", "Tops", "https://oqvestir.fbitsstatic.net/img/p/t-shirt-em-modal-e-seda-gola-redonda-cinza-184634/488101.jpg?w=1600&h=2133&v=202501231557"),
-            ClothingItem(2, "Blue Shirt", "Tops", "https://cottonon.com/dw/image/v2/BBDS_PRD/on/demandware.static/-/Sites-catalog-master-men/default/dwf789fe11/3611849/3611849-13-5.jpg?sw=640&sh=960&sm=fit"),
-            ClothingItem(3, "Black Shorts", "Bottoms", "https://cdn.vnda.com.br/bolovo/2024/06/20/09_08_35_847_9_6_9_935_onlinebolovo_0051_blv51.jpg?v=1718885328"),
-            ClothingItem(4, "White Sneakers", "Footwear", "https://oqvestir.fbitsstatic.net/img/p/t-shirt-em-modal-e-seda-gola-redonda-cinza-184634/488101.jpg?w=1600&h=2133&v=202501231557"),
-            ClothingItem(5, "Red Jacket", "Outerwear", "https://cottonon.com/dw/image/v2/BBDS_PRD/on/demandware.static/-/Sites-catalog-master-men/default/dwf789fe11/3611849/3611849-13-5.jpg?sw=640&sh=960&sm=fit"),
-        )
+    // ✅ Carrega as roupas DO USUÁRIO
+    LaunchedEffect(Unit) {
+        visible = true
+        viewModel.loadUserClothes()
     }
 
+    // ✅ Pega as roupas reais do usuário
+    val userClothes = when (clothesState) {
+        is WardrobeViewModel.ClothesState.Success -> {
+            (clothesState as WardrobeViewModel.ClothesState.Success).items
+        }
+        else -> emptyList()
+    }
+
+    // ✅ Agrupa as roupas por categoria
+    val clothesByCategory = remember(userClothes) {
+        userClothes.groupBy { it.category ?: "Uncategorized" }
+    }
+
+    // ✅ Cria as linhas de outfit baseado nas categorias disponíveis
     var outfitRows by remember {
-        mutableStateOf(
-            (0 until 3).map { rowIndex ->
-                OutfitRow(
-                    id = rowIndex,
-                    items = availableItems.shuffled().take(Random.nextInt(2, 5)),
-                    currentIndex = 0,
-                    isPinned = false
-                )
-            }
-        )
+        mutableStateOf<List<OutfitRow>>(emptyList())
     }
 
-    // Update rows when numberOfRows changes
-    LaunchedEffect(numberOfRows) {
-        val currentSize = outfitRows.size
-        if (numberOfRows > currentSize) {
-            outfitRows = outfitRows + (currentSize until numberOfRows).map { rowIndex ->
+    // ✅ Atualiza as linhas quando as roupas carregarem
+    LaunchedEffect(clothesByCategory) {
+        if (clothesByCategory.isNotEmpty()) {
+            val categories = clothesByCategory.keys.toList()
+            outfitRows = (0 until numberOfRows.coerceAtMost(categories.size)).map { rowIndex ->
+                val category = categories.getOrNull(rowIndex)
+                val items = if (category != null) {
+                    clothesByCategory[category] ?: emptyList()
+                } else {
+                    emptyList()
+                }
+
                 OutfitRow(
                     id = rowIndex,
-                    items = availableItems.shuffled().take(Random.nextInt(2, 5)),
+                    items = items,
                     currentIndex = 0,
                     isPinned = false
                 )
             }
-        } else if (numberOfRows < currentSize) {
-            outfitRows = outfitRows.take(numberOfRows)
         }
     }
 
-    LaunchedEffect(Unit) {
-        visible = true
+    // ✅ Atualiza quando mudar o número de linhas
+    LaunchedEffect(numberOfRows, clothesByCategory) {
+        if (clothesByCategory.isNotEmpty()) {
+            val categories = clothesByCategory.keys.toList()
+            val currentSize = outfitRows.size
+
+            if (numberOfRows > currentSize) {
+                // Adiciona mais linhas
+                outfitRows = outfitRows + (currentSize until numberOfRows.coerceAtMost(categories.size)).map { rowIndex ->
+                    val category = categories.getOrNull(rowIndex)
+                    val items = if (category != null) {
+                        clothesByCategory[category] ?: emptyList()
+                    } else {
+                        emptyList()
+                    }
+
+                    OutfitRow(
+                        id = rowIndex,
+                        items = items,
+                        currentIndex = 0,
+                        isPinned = false
+                    )
+                }
+            } else if (numberOfRows < currentSize) {
+                // Remove linhas
+                outfitRows = outfitRows.take(numberOfRows)
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -130,7 +170,6 @@ fun StylingScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Filter button - same height as Save button
                             val filterInteractionSource = remember { MutableInteractionSource() }
                             val isFilterPressed by filterInteractionSource.collectIsPressedAsState()
                             val filterScale by animateFloatAsState(
@@ -197,37 +236,105 @@ fun StylingScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Outfit rows with carousel - dividindo a tela útil
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.SpaceEvenly,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        outfitRows.forEach { row ->
-                            OutfitCarouselRow(
-                                row = row,
-                                numberOfRows = numberOfRows,
-                                onSwipe = { newIndex ->
-                                    outfitRows = outfitRows.map {
-                                        if (it.id == row.id) it.copy(currentIndex = newIndex)
-                                        else it
-                                    }
-                                },
-                                onPinToggle = {
-                                    outfitRows = outfitRows.map {
-                                        if (it.id == row.id) it.copy(isPinned = !it.isPinned)
-                                        else it
-                                    }
-                                },
-                                onItemClick = { index ->
-                                    outfitRows = outfitRows.map {
-                                        if (it.id == row.id) it.copy(currentIndex = index)
-                                        else it
+                    // ✅ Mostra loading ou conteúdo
+                    when (clothesState) {
+                        is WardrobeViewModel.ClothesState.Loading -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = Color(0xFF121212))
+                            }
+                        }
+
+                        is WardrobeViewModel.ClothesState.Error -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Error loading clothes",
+                                    color = Color.Red,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        else -> {
+                            if (userClothes.isEmpty()) {
+                                // ✅ Estado vazio - usuário não tem roupas
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "No clothes yet",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF121212)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Add some clothes to create outfits",
+                                            fontSize = 14.sp,
+                                            color = Color.Gray
+                                        )
+                                        Spacer(modifier = Modifier.height(24.dp))
+                                        Button(
+                                            onClick = { navController.navigate("add") },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFF121212)
+                                            )
+                                        ) {
+                                            Text("Add Clothes")
+                                        }
                                     }
                                 }
-                            )
+                            } else {
+                                // ✅ Mostra as roupas do usuário
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    verticalArrangement = Arrangement.SpaceEvenly,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    outfitRows.forEach { row ->
+                                        OutfitCarouselRow(
+                                            row = row,
+                                            numberOfRows = numberOfRows,
+                                            onSwipe = { newIndex ->
+                                                outfitRows = outfitRows.map {
+                                                    if (it.id == row.id) it.copy(currentIndex = newIndex)
+                                                    else it
+                                                }
+                                            },
+                                            onPinToggle = {
+                                                outfitRows = outfitRows.map {
+                                                    if (it.id == row.id) it.copy(isPinned = !it.isPinned)
+                                                    else it
+                                                }
+                                            },
+                                            onItemClick = { index ->
+                                                outfitRows = outfitRows.map {
+                                                    if (it.id == row.id) it.copy(currentIndex = index)
+                                                    else it
+                                                }
+                                            },
+                                            onAddClick = { navController.navigate("add") }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -286,45 +393,42 @@ fun ColumnScope.OutfitCarouselRow(
     numberOfRows: Int,
     onSwipe: (Int) -> Unit,
     onPinToggle: () -> Unit,
-    onItemClick: (Int) -> Unit
+    onItemClick: (Int) -> Unit,
+    onAddClick: () -> Unit
 ) {
     var offsetX by remember { mutableStateOf(0f) }
 
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
 
-    // Calcula o tamanho do item baseado na largura da tela e espaçamento
-    val horizontalPadding = 24.dp * 2 // padding das laterais
-    val spacing = 12.dp * 2 // espaçamento entre os items (left-center, center-right)
+    val horizontalPadding = 24.dp * 2
+    val spacing = 12.dp * 2
     val availableWidth = screenWidth - horizontalPadding - spacing
 
-    // Ajusta o tamanho baseado no número de linhas
     val centerWidthPercentage = when (numberOfRows) {
-        2 -> 0.55f // 2 linhas = peças maiores (55% da largura)
-        3 -> 0.45f // 3 linhas = tamanho médio (45% da largura)
-        4 -> 0.38f // 4 linhas = peças menores (38% da largura)
+        2 -> 0.55f
+        3 -> 0.45f
+        4 -> 0.38f
         else -> 0.45f
     }
 
-    // Item central ocupa a porcentagem definida da largura disponível
     val centerItemSize = availableWidth * centerWidthPercentage
-    // Items laterais são ~70% do tamanho do item central
     val sideItemSize = centerItemSize * 0.7f
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f), // Divide igualmente o espaço entre as linhas
+            .weight(1f),
         contentAlignment = Alignment.Center
     ) {
         if (row.items.isEmpty()) {
-            // Show Add Item centered
+            // ✅ Botão para adicionar roupas
             Box(
                 modifier = Modifier
                     .size(centerItemSize)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFFE5E5E5))
-                    .clickable { /* TODO: Navigate to add item */ },
+                    .clickable { onAddClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -338,14 +442,13 @@ fun ColumnScope.OutfitCarouselRow(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Add Item",
+                        text = "Add Clothes",
                         fontSize = 12.sp,
                         color = Color(0xFF808080)
                     )
                 }
             }
         } else {
-            // Show carousel com 3 colunas: esquerda, centro, direita
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -356,10 +459,8 @@ fun ColumnScope.OutfitCarouselRow(
                                     val threshold = 50f
                                     if (offsetX.absoluteValue > threshold) {
                                         val newIndex = if (offsetX > 0) {
-                                            // Swipe right = go to previous item
                                             (row.currentIndex - 1 + row.items.size) % row.items.size
                                         } else {
-                                            // Swipe left = go to next item
                                             (row.currentIndex + 1) % row.items.size
                                         }
                                         onSwipe(newIndex)
@@ -379,12 +480,10 @@ fun ColumnScope.OutfitCarouselRow(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Calculate indices for left, center, right (infinite carousel loop)
                     val centerIndex = row.currentIndex % row.items.size
                     val leftIndex = (row.currentIndex - 1 + row.items.size) % row.items.size
                     val rightIndex = (row.currentIndex + 1) % row.items.size
 
-                    // Left item (previous item, clipped/cut off)
                     Box(
                         modifier = Modifier
                             .width(sideItemSize * 0.6f)
@@ -405,7 +504,6 @@ fun ColumnScope.OutfitCarouselRow(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Center item (current item, fully visible with pin)
                     CarouselItem(
                         item = row.items[centerIndex],
                         size = centerItemSize,
@@ -419,7 +517,6 @@ fun ColumnScope.OutfitCarouselRow(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Right item (next item, clipped/cut off)
                     Box(
                         modifier = Modifier
                             .width(sideItemSize * 0.6f)
@@ -473,14 +570,13 @@ fun CarouselItem(
                 .clickable(onClick = onClick)
         ) {
             AsyncImage(
-                model = item.imageUrl,
+                model = item.clothingPictureUrl,
                 contentDescription = item.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Pin button only on center item
         if (isCenter) {
             val pinInteractionSource = remember { MutableInteractionSource() }
             val isPinPressed by pinInteractionSource.collectIsPressedAsState()
@@ -642,13 +738,13 @@ private fun BottomNavigationBarStyling(navController: NavController, currentRout
                 contentDescription = "Add",
                 route = "add",
                 currentRoute = currentRoute,
-                navController = navController,
+                navController
+                = navController,
                 isAddButton = true
             )
         }
     }
 }
-
 @Composable
 private fun RowScope.NavBarItemStyling(
     icon: Int?,
@@ -664,7 +760,6 @@ private fun RowScope.NavBarItemStyling(
         targetValue = if (isPressed) 0.85f else 1f,
         animationSpec = tween(durationMillis = 100)
     )
-
     NavigationBarItem(
         icon = {
             if (isAddButton) {
