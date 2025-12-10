@@ -1,10 +1,12 @@
 package com.example.ocreaite.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -20,15 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.ocreaite.MainActivity
 import com.example.ocreaite.R
+import com.example.ocreaite.viewmodels.AuthViewModel
 
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -37,8 +41,56 @@ fun LoginScreen(navController: NavController) {
     var visible by remember { mutableStateOf(false) }
     var navigateBack by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val viewModel = remember { AuthViewModel(context) }
+    val authState by viewModel.authState.collectAsState()
+
+    val activity = context as? MainActivity
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val idToken = activity?.googleSignInHelper?.handleSignInResult(result.data)
+        if (idToken != null) {
+            viewModel.googleLogin(idToken)
+        } else {
+            Toast.makeText(context, "Google Sign In failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(Unit) {
         visible = true
+    }
+
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Success -> {
+                val successState = authState as AuthViewModel.AuthState.Success
+                val userName = successState.userName
+                val hasCompletedOnboarding = successState.hasCompletedOnboarding
+
+                Toast.makeText(context, "Welcome back, $userName!", Toast.LENGTH_SHORT).show()
+                viewModel.resetState()
+
+                if (hasCompletedOnboarding) {
+                    navController.navigate("wardrobe") {
+                        popUpTo("splash1") { inclusive = true }
+                    }
+                } else {
+                    navController.navigate("interests") {
+                        popUpTo("splash1") { inclusive = true }
+                    }
+                }
+            }
+
+            is AuthViewModel.AuthState.Error -> {
+                val message = (authState as AuthViewModel.AuthState.Error).message
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                viewModel.resetState()
+            }
+
+            else -> {}
+        }
     }
 
     LaunchedEffect(navigateBack) {
@@ -55,7 +107,17 @@ fun LoginScreen(navController: NavController) {
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // Botão voltar
+        if (authState is AuthViewModel.AuthState.Loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
         IconButton(
             onClick = {
                 visible = false
@@ -89,7 +151,6 @@ fun LoginScreen(navController: NavController) {
             ) {
                 Spacer(modifier = Modifier.height(80.dp))
 
-                // Título
                 Text(
                     text = "Log in",
                     fontSize = 32.sp,
@@ -99,7 +160,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                // Email/Phone field
                 Text(
                     text = "Email address/phone number",
                     fontSize = 13.sp,
@@ -115,6 +175,9 @@ fun LoginScreen(navController: NavController) {
                         .fillMaxWidth()
                         .height(56.dp),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email
+                    ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF121212),
                         unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -127,7 +190,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Password field
                 Text(
                     text = "Password",
                     fontSize = 13.sp,
@@ -157,7 +219,6 @@ fun LoginScreen(navController: NavController) {
                     shape = RoundedCornerShape(8.dp)
                 )
 
-                // Forgot password
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.CenterEnd
@@ -177,7 +238,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Login button
                 val loginInteractionSource = remember { MutableInteractionSource() }
                 val isLoginPressed by loginInteractionSource.collectIsPressedAsState()
                 val loginScale by animateFloatAsState(
@@ -186,7 +246,17 @@ fun LoginScreen(navController: NavController) {
                 )
 
                 Button(
-                    onClick = { /* TODO: Login logic */ },
+                    onClick = {
+                        if (email.isBlank() || password.isBlank()) {
+                            Toast.makeText(
+                                context,
+                                "Please enter email and password",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            viewModel.login(email.trim(), password)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -210,7 +280,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Or Login with
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -233,7 +302,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Google button
                 val googleInteractionSource = remember { MutableInteractionSource() }
                 val isGooglePressed by googleInteractionSource.collectIsPressedAsState()
                 val googleScale by animateFloatAsState(
@@ -242,7 +310,14 @@ fun LoginScreen(navController: NavController) {
                 )
 
                 OutlinedButton(
-                    onClick = { /* TODO: Google sign in */ },
+                    onClick = {
+                        activity?.let {
+                            val signInIntent = it.googleSignInHelper.getSignInIntent()
+                            googleSignInLauncher.launch(signInIntent)
+                        } ?: run {
+                            Toast.makeText(context, "Google Sign In not available", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -274,7 +349,6 @@ fun LoginScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Sign up link
                 var isSignUpPressed by remember { mutableStateOf(false) }
 
                 val signUpAlpha by animateFloatAsState(

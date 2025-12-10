@@ -5,5 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AuthResponse(
     val name: String,
-    val token: String
+    val token: String,
+    val hasCompletedOnboarding: Boolean  // ✅ NOVO
 )

@@ -25,10 +25,11 @@ class AuthViewModel(context: Context) : ViewModel() {
     private val _usernameValidationState = MutableStateFlow<UsernameValidationState>(UsernameValidationState.Idle)
     val usernameValidationState: StateFlow<UsernameValidationState> = _usernameValidationState
 
+    // ✅ MODIFICADO: Incluir hasCompletedOnboarding
     sealed class AuthState {
         object Idle : AuthState()
         object Loading : AuthState()
-        data class Success(val userName: String) : AuthState()
+        data class Success(val userName: String, val hasCompletedOnboarding: Boolean) : AuthState()
         data class Error(val message: String) : AuthState()
     }
 
@@ -50,13 +51,11 @@ class AuthViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             _emailValidationState.value = EmailValidationState.Loading
 
-            // Validação básica de formato
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
                 _emailValidationState.value = EmailValidationState.Invalid("Invalid email format")
                 return@launch
             }
 
-            // Verifica se o email já existe no backend
             when (val result = repository.checkEmailExists(email)) {
                 is AuthRepository.EmailCheckResult.Available -> {
                     _emailValidationState.value = EmailValidationState.Valid
@@ -75,13 +74,11 @@ class AuthViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             _usernameValidationState.value = UsernameValidationState.Loading
 
-            // Validação básica
             if (username.length < 3) {
                 _usernameValidationState.value = UsernameValidationState.Invalid("Username must be at least 3 characters")
                 return@launch
             }
 
-            // Verifica se o username já existe no backend
             when (val result = repository.checkUsernameExists(username)) {
                 is AuthRepository.UsernameCheckResult.Available -> {
                     _usernameValidationState.value = UsernameValidationState.Valid
@@ -101,7 +98,11 @@ class AuthViewModel(context: Context) : ViewModel() {
             _authState.value = AuthState.Loading
             when (val result = repository.login(email, password)) {
                 is AuthRepository.AuthResult.Success -> {
-                    _authState.value = AuthState.Success(result.response.name)
+                    // ✅ MODIFICADO: Passar hasCompletedOnboarding
+                    _authState.value = AuthState.Success(
+                        result.response.name,
+                        result.response.hasCompletedOnboarding
+                    )
                 }
                 is AuthRepository.AuthResult.Error -> {
                     _authState.value = AuthState.Error(result.message)
@@ -130,7 +131,11 @@ class AuthViewModel(context: Context) : ViewModel() {
             when (val result = repository.register(email, password, username, name, birthDate)) {
                 is AuthRepository.AuthResult.Success -> {
                     Log.d(TAG, "✅ Register success in ViewModel")
-                    _authState.value = AuthState.Success(result.response.name)
+                    // ✅ MODIFICADO: Passar hasCompletedOnboarding
+                    _authState.value = AuthState.Success(
+                        result.response.name,
+                        result.response.hasCompletedOnboarding
+                    )
                 }
                 is AuthRepository.AuthResult.Error -> {
                     Log.e(TAG, "❌ Register error in ViewModel: ${result.message}")
@@ -145,7 +150,11 @@ class AuthViewModel(context: Context) : ViewModel() {
             _authState.value = AuthState.Loading
             when (val result = repository.googleLogin(idToken)) {
                 is AuthRepository.AuthResult.Success -> {
-                    _authState.value = AuthState.Success(result.response.name)
+                    // ✅ MODIFICADO: Passar hasCompletedOnboarding
+                    _authState.value = AuthState.Success(
+                        result.response.name,
+                        result.response.hasCompletedOnboarding
+                    )
                 }
                 is AuthRepository.AuthResult.Error -> {
                     _authState.value = AuthState.Error(result.message)
