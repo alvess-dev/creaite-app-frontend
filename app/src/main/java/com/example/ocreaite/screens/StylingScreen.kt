@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.ocreaite.R
+import com.example.ocreaite.components.SmartImage
 import com.example.ocreaite.data.models.ClothingItem
 import com.example.ocreaite.viewmodels.WardrobeViewModel
 import kotlin.math.absoluteValue
@@ -42,6 +42,7 @@ import kotlin.random.Random
 
 data class OutfitRow(
     val id: Int,
+    val category: String,
     val items: List<ClothingItem>,
     var currentIndex: Int = 0,
     var isPinned: Boolean = false
@@ -55,14 +56,27 @@ fun StylingScreen(navController: NavController) {
 
     var numberOfRows by remember { mutableStateOf(3) }
     var visible by remember { mutableStateOf(false) }
+    var isGymOutfit by remember { mutableStateOf(false) }
 
-    // ✅ Carrega as roupas DO USUÁRIO
-    LaunchedEffect(Unit) {
+    // ✅ Verifica se deve mostrar outfit de academia
+    val currentBackStackEntry = navController.currentBackStackEntry
+    val showGymOutfit = currentBackStackEntry?.savedStateHandle?.get<Boolean>("showGymOutfit") ?: false
+
+    // ✅ Carrega as roupas
+    LaunchedEffect(showGymOutfit) {
         visible = true
-        viewModel.loadUserClothes()
+        if (showGymOutfit) {
+            isGymOutfit = true
+            viewModel.loadGymOutfit()
+            // Limpa o flag
+            currentBackStackEntry?.savedStateHandle?.remove<Boolean>("showGymOutfit")
+        } else {
+            isGymOutfit = false
+            viewModel.loadUserClothes()
+        }
     }
 
-    // ✅ Pega as roupas reais do usuário
+    // ✅ Pega as roupas
     val userClothes = when (clothesState) {
         is WardrobeViewModel.ClothesState.Success -> {
             (clothesState as WardrobeViewModel.ClothesState.Success).items
@@ -75,59 +89,60 @@ fun StylingScreen(navController: NavController) {
         userClothes.groupBy { it.category ?: "Uncategorized" }
     }
 
-    // ✅ Cria as linhas de outfit baseado nas categorias disponíveis
+    // ✅ Define a hierarquia baseada no número de linhas
+    val categoryHierarchy = remember(numberOfRows) {
+        when (numberOfRows) {
+            2 -> listOf("Top", "Bottom")
+            3 -> listOf("Top", "Bottom", "Shoes")
+            4 -> listOf("Hat", "Top", "Bottom", "Shoes")
+            else -> listOf("Top", "Bottom", "Shoes")
+        }
+    }
+
+    // ✅ Cria as linhas de outfit seguindo a hierarquia
     var outfitRows by remember {
         mutableStateOf<List<OutfitRow>>(emptyList())
     }
 
-    // ✅ Atualiza as linhas quando as roupas carregarem
-    LaunchedEffect(clothesByCategory) {
+    // ✅ Atualiza as linhas quando as roupas carregarem ou número de linhas mudar
+    LaunchedEffect(clothesByCategory, numberOfRows, isGymOutfit) {
         if (clothesByCategory.isNotEmpty()) {
-            val categories = clothesByCategory.keys.toList()
-            outfitRows = (0 until numberOfRows.coerceAtMost(categories.size)).map { rowIndex ->
-                val category = categories.getOrNull(rowIndex)
-                val items = if (category != null) {
-                    clothesByCategory[category] ?: emptyList()
-                } else {
-                    emptyList()
-                }
-
-                OutfitRow(
-                    id = rowIndex,
-                    items = items,
-                    currentIndex = 0,
-                    isPinned = false
-                )
-            }
-        }
-    }
-
-    // ✅ Atualiza quando mudar o número de linhas
-    LaunchedEffect(numberOfRows, clothesByCategory) {
-        if (clothesByCategory.isNotEmpty()) {
-            val categories = clothesByCategory.keys.toList()
-            val currentSize = outfitRows.size
-
-            if (numberOfRows > currentSize) {
-                // Adiciona mais linhas
-                outfitRows = outfitRows + (currentSize until numberOfRows.coerceAtMost(categories.size)).map { rowIndex ->
-                    val category = categories.getOrNull(rowIndex)
-                    val items = if (category != null) {
-                        clothesByCategory[category] ?: emptyList()
-                    } else {
-                        emptyList()
-                    }
-
+            if (isGymOutfit) {
+                // Outfit de academia fixo (3 linhas)
+                outfitRows = listOf(
                     OutfitRow(
-                        id = rowIndex,
-                        items = items,
+                        id = 0,
+                        category = "Top",
+                        items = clothesByCategory["Top"] ?: emptyList(),
+                        currentIndex = 0,
+                        isPinned = false
+                    ),
+                    OutfitRow(
+                        id = 1,
+                        category = "Bottom",
+                        items = clothesByCategory["Bottom"] ?: emptyList(),
+                        currentIndex = 0,
+                        isPinned = false
+                    ),
+                    OutfitRow(
+                        id = 2,
+                        category = "Shoes",
+                        items = clothesByCategory["Shoes"] ?: emptyList(),
+                        currentIndex = 0,
+                        isPinned = false
+                    )
+                )
+            } else {
+                // Segue a hierarquia normal
+                outfitRows = categoryHierarchy.mapIndexed { index, category ->
+                    OutfitRow(
+                        id = index,
+                        category = category,
+                        items = clothesByCategory[category] ?: emptyList(),
                         currentIndex = 0,
                         isPinned = false
                     )
                 }
-            } else if (numberOfRows < currentSize) {
-                // Remove linhas
-                outfitRows = outfitRows.take(numberOfRows)
             }
         }
     }
@@ -159,17 +174,63 @@ fun StylingScreen(navController: NavController) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Styling",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF121212)
-                        )
+                        Column {
+                            Text(
+                                text = "Styling",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF121212)
+                            )
+                            if (isGymOutfit) {
+                                Text(
+                                    text = "Gym Outfit",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF666666)
+                                )
+                            }
+                        }
 
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (isGymOutfit) {
+                                // Botão para voltar ao modo normal
+                                val backInteractionSource = remember { MutableInteractionSource() }
+                                val isBackPressed by backInteractionSource.collectIsPressedAsState()
+                                val backScale by animateFloatAsState(
+                                    targetValue = if (isBackPressed) 0.9f else 1f,
+                                    animationSpec = tween(durationMillis = 100)
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .height(40.dp)
+                                        .graphicsLayer {
+                                            scaleX = backScale
+                                            scaleY = backScale
+                                        }
+                                        .background(Color(0xFFD9D9D9), RoundedCornerShape(8.dp))
+                                        .clickable(
+                                            interactionSource = backInteractionSource,
+                                            indication = null,
+                                            onClick = {
+                                                isGymOutfit = false
+                                                viewModel.loadUserClothes()
+                                            }
+                                        )
+                                        .padding(horizontal = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Back",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF121212)
+                                    )
+                                }
+                            }
+
                             val filterInteractionSource = remember { MutableInteractionSource() }
                             val isFilterPressed by filterInteractionSource.collectIsPressedAsState()
                             val filterScale by animateFloatAsState(
@@ -266,7 +327,7 @@ fun StylingScreen(navController: NavController) {
 
                         else -> {
                             if (userClothes.isEmpty()) {
-                                // ✅ Estado vazio - usuário não tem roupas
+                                // ✅ Estado vazio
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -300,7 +361,7 @@ fun StylingScreen(navController: NavController) {
                                     }
                                 }
                             } else {
-                                // ✅ Mostra as roupas do usuário
+                                // ✅ Mostra as roupas
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -311,7 +372,7 @@ fun StylingScreen(navController: NavController) {
                                     outfitRows.forEach { row ->
                                         OutfitCarouselRow(
                                             row = row,
-                                            numberOfRows = numberOfRows,
+                                            numberOfRows = if (isGymOutfit) 3 else numberOfRows,
                                             onSwipe = { newIndex ->
                                                 outfitRows = outfitRows.map {
                                                     if (it.id == row.id) it.copy(currentIndex = newIndex)
@@ -338,48 +399,52 @@ fun StylingScreen(navController: NavController) {
                         }
                     }
 
-                    // Bottom controls
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                            .height(60.dp)
-                            .background(Color(0xFF121212), RoundedCornerShape(30.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
+                    // Bottom controls - esconde no modo gym outfit
+                    if (!isGymOutfit) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp)
+                                .height(60.dp)
+                                .background(Color(0xFF121212), RoundedCornerShape(30.dp)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            GridButton(
-                                iconRes = R.drawable.logo,
-                                isSelected = numberOfRows == 2,
-                                onClick = { numberOfRows = 2 }
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                GridButton(
+                                    iconRes = R.drawable.duascolunas,
+                                    isSelected = numberOfRows == 2,
+                                    onClick = { numberOfRows = 2 }
+                                )
 
-                            GridButton(
-                                iconRes = R.drawable.logo,
-                                isSelected = numberOfRows == 3,
-                                onClick = { numberOfRows = 3 }
-                            )
+                                GridButton(
+                                    iconRes = R.drawable.trescolunas,
+                                    isSelected = numberOfRows == 3,
+                                    onClick = { numberOfRows = 3 }
+                                )
 
-                            GridButton(
-                                iconRes = R.drawable.logo,
-                                isSelected = numberOfRows == 4,
-                                onClick = { numberOfRows = 4 }
-                            )
+                                GridButton(
+                                    iconRes = R.drawable.quatrocolunas,
+                                    isSelected = numberOfRows == 4,
+                                    onClick = { numberOfRows = 4 }
+                                )
 
-                            DiceButton(
-                                onClick = {
-                                    outfitRows = outfitRows.map { row ->
-                                        if (!row.isPinned && row.items.isNotEmpty()) {
-                                            row.copy(currentIndex = Random.nextInt(row.items.size))
-                                        } else row
+                                DiceButton(
+                                    onClick = {
+                                        outfitRows = outfitRows.map { row ->
+                                            if (!row.isPinned && row.items.isNotEmpty()) {
+                                                row.copy(currentIndex = Random.nextInt(row.items.size))
+                                            } else row
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
+                    } else {
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }
@@ -442,7 +507,7 @@ fun ColumnScope.OutfitCarouselRow(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Add Clothes",
+                        text = "Add ${row.category}",
                         fontSize = 12.sp,
                         color = Color(0xFF808080)
                     )
@@ -569,8 +634,8 @@ fun CarouselItem(
                 .background(Color(0xFFE5E5E5))
                 .clickable(onClick = onClick)
         ) {
-            AsyncImage(
-                model = item.clothingPictureUrl,
+            SmartImage(
+                imageUrl = item.clothingPictureUrl,
                 contentDescription = item.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -606,7 +671,7 @@ fun CarouselItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.logo),
+                    painter = painterResource(id = R.drawable.pushpin),
                     contentDescription = "Pin",
                     tint = if (isPinned) Color(0xFFFF6B6B) else Color.Black,
                     modifier = Modifier.size(16.dp)
@@ -676,7 +741,7 @@ fun DiceButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.logo),
+            painter = painterResource(id = R.drawable.dados),
             contentDescription = "Random",
             tint = Color.White,
             modifier = Modifier.fillMaxSize()
@@ -738,13 +803,13 @@ private fun BottomNavigationBarStyling(navController: NavController, currentRout
                 contentDescription = "Add",
                 route = "add",
                 currentRoute = currentRoute,
-                navController
-                = navController,
+                navController = navController,
                 isAddButton = true
             )
         }
     }
 }
+
 @Composable
 private fun RowScope.NavBarItemStyling(
     icon: Int?,

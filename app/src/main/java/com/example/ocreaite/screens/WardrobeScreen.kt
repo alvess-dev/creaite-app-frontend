@@ -19,8 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,8 +36,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.ocreaite.R
+import com.example.ocreaite.components.SmartImage
 import com.example.ocreaite.data.models.ClothingItem
 import com.example.ocreaite.data.models.ProcessingStatus
 import com.example.ocreaite.viewmodels.WardrobeViewModel
@@ -53,11 +51,15 @@ fun WardrobeScreen(navController: NavController) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    var showOnlyFavorites by remember { mutableStateOf(false) }
 
-    // Carrega as roupas quando a tela aparece
-    LaunchedEffect(selectedCategory) {
+    // ✅ Carrega as roupas mockadas quando a tela aparece
+    LaunchedEffect(Unit) {
         visible = true
+        viewModel.loadUserClothes()
+    }
+
+    // ✅ Recarrega quando categoria muda
+    LaunchedEffect(selectedCategory) {
         viewModel.loadUserClothes(selectedCategory)
     }
 
@@ -68,16 +70,18 @@ fun WardrobeScreen(navController: NavController) {
         else -> emptyList()
     }
 
+    // ✅ Pega todas as categorias disponíveis (das roupas mockadas)
     val availableCategories = remember(clothingItems) {
-        clothingItems.mapNotNull { it.category }.distinct()
+        clothingItems.mapNotNull { it.category }.distinct().sorted()
     }
 
-    val filteredItems = remember(selectedCategory, searchText, clothingItems, showOnlyFavorites) {
+    // ✅ Filtra por busca
+    val filteredItems = remember(searchText, clothingItems) {
         clothingItems.filter { item ->
-            val matchesCategory = selectedCategory == null || item.category == selectedCategory
             val matchesSearch = searchText.isEmpty() ||
-                    (item.name?.contains(searchText, ignoreCase = true) == true)
-            matchesCategory && matchesSearch
+                    (item.name?.contains(searchText, ignoreCase = true) == true) ||
+                    (item.category?.contains(searchText, ignoreCase = true) == true)
+            matchesSearch
         }
     }
 
@@ -115,12 +119,14 @@ fun WardrobeScreen(navController: NavController) {
                         if (clothingItems.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(24.dp))
 
+                            // ✅ Filtro de categorias funcionando
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
+                                // Botão "All"
                                 CategoryCircle(
                                     text = "All",
                                     imageUrl = clothingItems.firstOrNull()?.clothingPictureUrl,
@@ -128,6 +134,7 @@ fun WardrobeScreen(navController: NavController) {
                                     onClick = { selectedCategory = null }
                                 )
 
+                                // Categorias disponíveis
                                 availableCategories.forEach { category ->
                                     val categoryItem = clothingItems.firstOrNull { it.category == category }
                                     CategoryCircle(
@@ -142,6 +149,7 @@ fun WardrobeScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        // Search Bar
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -204,6 +212,7 @@ fun WardrobeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // Content
                     when (clothesState) {
                         is WardrobeViewModel.ClothesState.Loading -> {
                             Box(
@@ -230,7 +239,27 @@ fun WardrobeScreen(navController: NavController) {
 
                         else -> {
                             if (filteredItems.isEmpty()) {
-                                EmptyState(navController)
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = if (searchText.isEmpty()) "No clothes found" else "No results",
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF121212)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = if (searchText.isEmpty()) "Add some clothes to get started" else "Try a different search",
+                                            fontSize = 14.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
                             } else {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(2),
@@ -253,77 +282,6 @@ fun WardrobeScreen(navController: NavController) {
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyState(navController: NavController) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Start styling",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF000000)
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            val addInteractionSource = remember { MutableInteractionSource() }
-            val isAddPressed by addInteractionSource.collectIsPressedAsState()
-            val addScale by animateFloatAsState(
-                targetValue = if (isAddPressed) 0.9f else 1f,
-                animationSpec = tween(durationMillis = 100)
-            )
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clickable(
-                        interactionSource = addInteractionSource,
-                        indication = null,
-                        onClick = { navController.navigate("add") }
-                    )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .graphicsLayer {
-                            scaleX = addScale
-                            scaleY = addScale
-                        }
-                        .background(
-                            color = Color(0xFFD9D9D9),
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add items",
-                        tint = Color(0xFF000000),
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Add items",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFF000000)
-                )
             }
         }
     }
@@ -362,10 +320,8 @@ fun ClothingItemCard(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Mostra a imagem ou loading
             when (item.processingStatus) {
                 ProcessingStatus.PENDING, ProcessingStatus.PROCESSING -> {
-                    // Loading state
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
@@ -384,7 +340,6 @@ fun ClothingItemCard(
                 }
 
                 ProcessingStatus.FAILED -> {
-                    // Error state
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
@@ -405,9 +360,8 @@ fun ClothingItemCard(
                 }
 
                 ProcessingStatus.COMPLETED -> {
-                    // Imagem processada
-                    AsyncImage(
-                        model = item.clothingPictureUrl,
+                    SmartImage(
+                        imageUrl = item.clothingPictureUrl,
                         contentDescription = item.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -416,25 +370,23 @@ fun ClothingItemCard(
             }
         }
 
-        // Badge de status (se estiver processando)
-        if (item.processingStatus == ProcessingStatus.PROCESSING) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .background(
-                        color = Color(0xFF121212).copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "AI Processing",
-                    fontSize = 10.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium
+        // Badge com nome da categoria
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(8.dp)
+                .background(
+                    color = Color(0xFF121212).copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(8.dp)
                 )
-            }
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = item.category ?: "Unknown",
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -478,8 +430,8 @@ fun CategoryCircle(
             contentAlignment = Alignment.Center
         ) {
             if (imageUrl != null) {
-                AsyncImage(
-                    model = imageUrl,
+                SmartImage(
+                    imageUrl = imageUrl,
                     contentDescription = text,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -504,6 +456,7 @@ fun CategoryCircle(
         )
     }
 }
+
 @Composable
 fun BottomNavigationBar(navController: NavController, currentRoute: String) {
     Box(
@@ -570,6 +523,7 @@ fun BottomNavigationBar(navController: NavController, currentRoute: String) {
         }
     }
 }
+
 @Composable
 private fun RowScope.NavBarItem(
     icon: Int?,

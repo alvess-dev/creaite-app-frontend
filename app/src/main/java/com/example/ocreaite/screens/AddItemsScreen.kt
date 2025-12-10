@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +44,7 @@ import com.example.ocreaite.data.api.ClothesApiService
 import com.example.ocreaite.data.local.TokenManager
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import com.example.ocreaite.R
 
 @Composable
 fun AddItemsScreen(navController: NavController) {
@@ -212,11 +214,12 @@ fun AddItemsScreen(navController: NavController) {
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    painter = painterResource(id = R.drawable.camera),
                                     contentDescription = "Camera roll",
                                     tint = if (selectedTab == 0) Color(0xFF121212) else Color.Gray,
                                     modifier = Modifier.size(24.dp)
                                 )
+
                                 Text(
                                     text = "Camera roll",
                                     fontSize = 12.sp,
@@ -252,11 +255,12 @@ fun AddItemsScreen(navController: NavController) {
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    painter = painterResource(id = R.drawable.pasta),
                                     contentDescription = "Database",
                                     tint = if (selectedTab == 1) Color(0xFF121212) else Color.Gray,
                                     modifier = Modifier.size(24.dp)
                                 )
+
                                 Text(
                                     text = "Database",
                                     fontSize = 12.sp,
@@ -655,7 +659,7 @@ fun CameraRollContent(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        painter = painterResource(id = R.drawable.camera),
                         contentDescription = "Open camera",
                         tint = Color(0xFF121212),
                         modifier = Modifier.size(40.dp)

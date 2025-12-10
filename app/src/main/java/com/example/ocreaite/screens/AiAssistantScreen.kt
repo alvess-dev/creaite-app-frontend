@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/ocreaite/screens/AIAssistantScreen.kt
 package com.example.ocreaite.screens
 
 import androidx.compose.animation.core.*
@@ -83,7 +84,7 @@ fun AIAssistantScreen(navController: NavController) {
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.logo),
+                            painter = painterResource(id = R.drawable.burguer),
                             contentDescription = "Menu",
                             tint = Color(0xFF121212)
                         )
@@ -94,7 +95,7 @@ fun AIAssistantScreen(navController: NavController) {
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.logo),
+                            painter = painterResource(id = R.drawable.perfil),
                             contentDescription = "Profile",
                             tint = Color(0xFF121212)
                         )
@@ -105,7 +106,7 @@ fun AIAssistantScreen(navController: NavController) {
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.logo),
+                            painter = painterResource(id = R.drawable.novaconversa),
                             contentDescription = "Edit",
                             tint = Color(0xFF121212)
                         )
@@ -160,7 +161,7 @@ fun AIAssistantScreen(navController: NavController) {
                                 icon = R.drawable.logo,
                                 modifier = Modifier.weight(1f),
                                 onClick = {
-                                    messageText = "I want a gym outfit"
+                                    messageText = "I want a gym outfit with 3 items!"
                                 }
                             )
 
@@ -245,6 +246,8 @@ fun AIAssistantScreen(navController: NavController) {
                         if (messageText.isNotBlank()) {
                             val userMessage = Message(messageText, isUser = true)
                             messages = messages + userMessage
+
+                            val isGymOutfitRequest = messageText.contains("gym", ignoreCase = true)
                             messageText = ""
 
                             // Add loading message
@@ -253,15 +256,23 @@ fun AIAssistantScreen(navController: NavController) {
 
                             // Simulate AI response
                             coroutineScope.launch {
-                                delay(4000)
+                                delay(2000)
                                 // Remove loading message
                                 messages = messages.filter { !it.isLoading }
 
-                                val aiResponse = Message(
-                                    "Sure! Here's your gym outfit!",
-                                    isUser = false,
-                                    hasButton = true
-                                )
+                                val aiResponse = if (isGymOutfitRequest) {
+                                    Message(
+                                        "Sure! I've created a perfect gym outfit for you with 3 items!",
+                                        isUser = false,
+                                        hasButton = true
+                                    )
+                                } else {
+                                    Message(
+                                        "I can help you with that! Let me create an outfit for you.",
+                                        isUser = false,
+                                        hasButton = false
+                                    )
+                                }
                                 messages = messages + aiResponse
                             }
                         }
@@ -389,7 +400,13 @@ fun MessageBubble(
             )
 
             Button(
-                onClick = { navController.navigate("outfit") },
+                onClick = {
+                    // ✅ Passa o parâmetro para mostrar gym outfit
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("showGymOutfit", true)
+                    navController.navigate("outfit")
+                },
                 modifier = Modifier
                     .graphicsLayer {
                         scaleX = buttonScale
