@@ -4,14 +4,17 @@ package com.example.ocreaite.viewmodels
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ocreaite.data.MockData
+import com.example.ocreaite.data.api.ClothesApiService
+import com.example.ocreaite.data.local.TokenManager
 import com.example.ocreaite.data.models.ClothingItem
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class WardrobeViewModel(private val context: Context) : ViewModel() {
+
+    private val tokenManager = TokenManager(context)
+    private val apiService = ClothesApiService(tokenManager)
 
     sealed class ClothesState {
         object Loading : ClothesState()
@@ -22,42 +25,62 @@ class WardrobeViewModel(private val context: Context) : ViewModel() {
     private val _clothesState = MutableStateFlow<ClothesState>(ClothesState.Loading)
     val clothesState: StateFlow<ClothesState> = _clothesState
 
-    // ✅ Carrega roupas mockadas
+    // ✅ Carrega roupas reais da API
     fun loadUserClothes(category: String? = null) {
         viewModelScope.launch {
             _clothesState.value = ClothesState.Loading
 
-            // Simula delay de rede
-            delay(500)
-
-            try {
-                // Pega as roupas mockadas
-                val clothes = if (category != null) {
-                    MockData.mockClothes.filter { it.category == category }
-                } else {
-                    MockData.mockClothes
+            when (val result = apiService.getUserClothes(category)) {
+                is ClothesApiService.ClothesResult.ListSuccess -> {
+                    _clothesState.value = ClothesState.Success(result.items)
                 }
-
-                _clothesState.value = ClothesState.Success(clothes)
-            } catch (e: Exception) {
-                _clothesState.value = ClothesState.Error("Failed to load clothes")
+                is ClothesApiService.ClothesResult.Error -> {
+                    _clothesState.value = ClothesState.Error(result.message)
+                }
+                else -> {
+                    _clothesState.value = ClothesState.Error("Unexpected error")
+                }
             }
         }
     }
 
-    // ✅ Carrega outfit de academia pré-definido
-    fun loadGymOutfit() {
+    // ✅ Toggle favorito
+    fun toggleFavorite(id: String) {
         viewModelScope.launch {
-            _clothesState.value = ClothesState.Loading
-            delay(300)
-            _clothesState.value = ClothesState.Success(MockData.gymOutfit)
+            when (val result = apiService.toggleFavorite(id)) {
+                is ClothesApiService.ClothesResult.Success -> {
+                    // Atualiza o item na lista local
+                    val currentState = _clothesState.value
+                    if (currentState is ClothesState.Success) {
+                        val updatedItems = currentState.items.map { item ->
+                            if (item.id == id) {
+                                result.item
+                            } else {
+                                item
+                            }
+                        }
+                        _clothesState.value = ClothesState.Success(updatedItems)
+                    }
+                }
+                is ClothesApiService.ClothesResult.Error -> {
+                    // Pode mostrar toast de erro
+                }
+                else -> {}
+            }
         }
     }
 
     fun deleteClothing(id: String) {
-        // Simulação - não faz nada
         viewModelScope.launch {
-            loadUserClothes()
+            when (apiService.deleteClothing(id)) {
+                is ClothesApiService.ClothesResult.Success -> {
+                    loadUserClothes()
+                }
+                is ClothesApiService.ClothesResult.Error -> {
+                    // Pode mostrar toast de erro
+                }
+                else -> {}
+            }
         }
     }
 }

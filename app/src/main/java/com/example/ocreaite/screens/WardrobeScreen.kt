@@ -7,19 +7,19 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,14 +51,13 @@ fun WardrobeScreen(navController: NavController) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
+    var favorites by remember { mutableStateOf(setOf<String>()) }
 
-    // ✅ Carrega as roupas mockadas quando a tela aparece
     LaunchedEffect(Unit) {
         visible = true
         viewModel.loadUserClothes()
     }
 
-    // ✅ Recarrega quando categoria muda
     LaunchedEffect(selectedCategory) {
         viewModel.loadUserClothes(selectedCategory)
     }
@@ -70,12 +69,6 @@ fun WardrobeScreen(navController: NavController) {
         else -> emptyList()
     }
 
-    // ✅ Pega todas as categorias disponíveis (das roupas mockadas)
-    val availableCategories = remember(clothingItems) {
-        clothingItems.mapNotNull { it.category }.distinct().sorted()
-    }
-
-    // ✅ Filtra por busca
     val filteredItems = remember(searchText, clothingItems) {
         clothingItems.filter { item ->
             val matchesSearch = searchText.isEmpty() ||
@@ -103,6 +96,7 @@ fun WardrobeScreen(navController: NavController) {
                         .padding(paddingValues)
                         .background(Color.White)
                 ) {
+                    // Header
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -115,37 +109,6 @@ fun WardrobeScreen(navController: NavController) {
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF121212)
                         )
-
-                        if (clothingItems.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            // ✅ Filtro de categorias funcionando
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                // Botão "All"
-                                CategoryCircle(
-                                    text = "All",
-                                    imageUrl = clothingItems.firstOrNull()?.clothingPictureUrl,
-                                    isSelected = selectedCategory == null,
-                                    onClick = { selectedCategory = null }
-                                )
-
-                                // Categorias disponíveis
-                                availableCategories.forEach { category ->
-                                    val categoryItem = clothingItems.firstOrNull { it.category == category }
-                                    CategoryCircle(
-                                        text = category,
-                                        imageUrl = categoryItem?.clothingPictureUrl,
-                                        isSelected = selectedCategory == category,
-                                        onClick = { selectedCategory = category }
-                                    )
-                                }
-                            }
-                        }
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -239,6 +202,7 @@ fun WardrobeScreen(navController: NavController) {
 
                         else -> {
                             if (filteredItems.isEmpty()) {
+                                // Estado vazio melhorado
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
@@ -247,16 +211,49 @@ fun WardrobeScreen(navController: NavController) {
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
-                                            text = if (searchText.isEmpty()) "No clothes found" else "No results",
-                                            fontSize = 18.sp,
+                                            text = "Start styling",
+                                            fontSize = 20.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF121212)
+                                            color = Color(0xFF121212),
+                                            modifier = Modifier.padding(bottom = 24.dp)
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        val addInteractionSource = remember { MutableInteractionSource() }
+                                        val isAddPressed by addInteractionSource.collectIsPressedAsState()
+                                        val addScale by animateFloatAsState(
+                                            targetValue = if (isAddPressed) 0.9f else 1f,
+                                            animationSpec = tween(100)
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(80.dp)
+                                                .graphicsLayer {
+                                                    scaleX = addScale
+                                                    scaleY = addScale
+                                                }
+                                                .background(Color(0xFF121212), CircleShape)
+                                                .clickable(
+                                                    interactionSource = addInteractionSource,
+                                                    indication = null,
+                                                    onClick = { navController.navigate("add") }
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Add items",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(40.dp)
+                                            )
+                                        }
+
                                         Text(
-                                            text = if (searchText.isEmpty()) "Add some clothes to get started" else "Try a different search",
+                                            text = "Add items",
                                             fontSize = 14.sp,
-                                            color = Color.Gray
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF121212),
+                                            modifier = Modifier.padding(top = 16.dp)
                                         )
                                     }
                                 }
@@ -273,6 +270,15 @@ fun WardrobeScreen(navController: NavController) {
                                     items(filteredItems) { item ->
                                         ClothingItemCard(
                                             item = item,
+                                            isFavorite = favorites.contains(item.id),
+                                            onFavoriteClick = {
+                                                favorites = if (favorites.contains(item.id)) {
+                                                    favorites - item.id
+                                                } else {
+                                                    favorites + item.id
+                                                }
+                                                // TODO: Enviar para o banco
+                                            },
                                             onDelete = { viewModel.deleteClothing(item.id) },
                                             onClick = { /* TODO: Navigate to item detail */ }
                                         )
@@ -290,6 +296,8 @@ fun WardrobeScreen(navController: NavController) {
 @Composable
 fun ClothingItemCard(
     item: ClothingItem,
+    isFavorite: Boolean,
+    onFavoriteClick: () -> Unit,
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -370,90 +378,38 @@ fun ClothingItemCard(
             }
         }
 
-        // Badge com nome da categoria
+        // Coração favorito (outline/preenchido)
+        val favoriteInteractionSource = remember { MutableInteractionSource() }
+        val isFavoritePressed by favoriteInteractionSource.collectIsPressedAsState()
+        val favoriteScale by animateFloatAsState(
+            targetValue = if (isFavoritePressed) 0.85f else 1f,
+            animationSpec = tween(100)
+        )
+
         Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
+                .align(Alignment.TopEnd)
                 .padding(8.dp)
-                .background(
-                    color = Color(0xFF121212).copy(alpha = 0.8f),
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = item.category ?: "Unknown",
-                fontSize = 10.sp,
-                color = Color.White,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-fun CategoryCircle(
-    text: String,
-    imageUrl: String?,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = tween(durationMillis = 100)
-    )
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
+                .size(32.dp)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = favoriteScale
+                    scaleY = favoriteScale
                 }
-                .clip(CircleShape)
-                .background(Color(0xFFE5E5E5))
-                .border(
-                    width = if (isSelected) 2.dp else 0.dp,
-                    color = if (isSelected) Color(0xFF121212) else Color.Transparent,
-                    shape = CircleShape
-                )
+                .background(Color.White.copy(alpha = 0.9f), CircleShape)
                 .clickable(
-                    interactionSource = interactionSource,
+                    interactionSource = favoriteInteractionSource,
                     indication = null,
-                    onClick = onClick
+                    onClick = onFavoriteClick
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (imageUrl != null) {
-                SmartImage(
-                    imageUrl = imageUrl,
-                    contentDescription = text,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = text,
-                    tint = Color(0xFF808080),
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            Icon(
+                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = "Favorite",
+                tint = if (isFavorite) Color(0xFFFF6B6B) else Color(0xFF121212),
+                modifier = Modifier.size(18.dp)
+            )
         }
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = Color(0xFF121212),
-            textAlign = TextAlign.Center
-        )
     }
 }
 

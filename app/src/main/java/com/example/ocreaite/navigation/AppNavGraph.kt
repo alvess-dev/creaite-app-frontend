@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/ocreaite/navigation/AppNavGraph.kt
 package com.example.ocreaite.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
@@ -14,7 +15,7 @@ import com.example.ocreaite.screens.*
 fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null) {
     NavHost(
         navController = navController,
-        startDestination = "splash1" // ✅ Volta para o fluxo normal
+        startDestination = "splash1"
     ) {
         // ==================== SPLASH & ONBOARDING ====================
 
@@ -75,35 +76,35 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
 
         // ==================== MAIN APP SCREENS ====================
 
-        // 🏠 Wardrobe (Home/Guarda-roupa)
         composable("wardrobe") {
             WardrobeScreen(navController)
         }
 
-        // 📅 Calendar
         composable("calendar") {
-            // TODO: Implementar CalendarScreen
-            WardrobeScreen(navController) // Temporário - mostra wardrobe
+            WardrobeScreen(navController)
         }
 
-        // 🤖 AI Assistant
         composable("ai") {
             AIAssistantScreen(navController)
         }
 
-        // 👔 Outfit/Styling
         composable("outfit") {
             StylingScreen(navController)
         }
 
-        // Alias para "outfit" (mesmo que styling)
         composable("styling") {
             StylingScreen(navController)
         }
 
-        // ➕ Add Items
         composable("add") {
             AddItemsScreen(navController)
+        }
+
+        // ✅ NOVO: Tela de edição de metadados
+        composable("edit_metadata") {
+            val previousEntry = navController.previousBackStackEntry
+            val imageUris = previousEntry?.savedStateHandle?.get<List<Uri>>("imageUris") ?: emptyList()
+            val imagesBase64 = previousEntry?.savedStateHandle?.get<List<String>>("imagesBase64") ?: emptyList()
         }
     }
 }

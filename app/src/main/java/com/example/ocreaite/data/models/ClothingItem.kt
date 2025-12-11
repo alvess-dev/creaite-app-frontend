@@ -2,7 +2,6 @@
 package com.example.ocreaite.data.models
 
 import kotlinx.serialization.Serializable
-import java.util.UUID
 
 @Serializable
 data class ClothingItem(
@@ -15,6 +14,7 @@ data class ClothingItem(
     val originalImageUrl: String?,
     val description: String?,
     val isPublic: Boolean?,
+    val isFavorite: Boolean?,  // ✅ NOVO
     val processingStatus: ProcessingStatus,
     val processingError: String?,
     val createdAt: String?,

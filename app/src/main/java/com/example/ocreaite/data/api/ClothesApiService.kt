@@ -28,7 +28,7 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         }
 
         engine {
-            requestTimeout = 60_000 // 60 segundos para uploads
+            requestTimeout = 60_000
         }
     }
 
@@ -37,6 +37,74 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         data class BatchSuccess(val response: BatchUploadResponse) : ClothesResult()
         data class ListSuccess(val items: List<ClothingItem>) : ClothesResult()
         data class Error(val message: String) : ClothesResult()
+    }
+
+    // ✅ NOVO: Upload avançado com metadados
+    suspend fun uploadAdvanced(
+        imageBase64: String,
+        name: String,
+        category: String,
+        color: String,
+        brand: String,
+        description: String?
+    ): ClothesResult {
+        return try {
+            Log.d(TAG, "=== Advanced Upload ===")
+            Log.d(TAG, "Name: $name, Category: $category")
+
+            val token = tokenManager.getAccessToken()
+            if (token == null) {
+                Log.e(TAG, "No token available")
+                return ClothesResult.Error("No authentication token")
+            }
+
+            val response: ClothingItem = client.post("$BASE_URL/clothes/upload/advanced") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(mapOf(
+                    "imageBase64" to imageBase64,
+                    "name" to name,
+                    "category" to category,
+                    "color" to color,
+                    "brand" to brand,
+                    "description" to description,
+                    "isPublic" to true
+                ))
+            }.body()
+
+            Log.d(TAG, "✅ Advanced upload successful - ID: ${response.id}")
+            ClothesResult.Success(response)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Advanced upload failed: ${e.message}", e)
+            ClothesResult.Error(e.message ?: "Advanced upload failed")
+        }
+    }
+
+    // ✅ NOVO: Toggle favorito
+    suspend fun toggleFavorite(id: String): ClothesResult {
+        return try {
+            Log.d(TAG, "=== Toggle Favorite ===")
+            Log.d(TAG, "ID: $id")
+
+            val token = tokenManager.getAccessToken()
+            if (token == null) {
+                Log.e(TAG, "No token available")
+                return ClothesResult.Error("No authentication token")
+            }
+
+            val response: ClothingItem = client.patch("$BASE_URL/clothes/$id/favorite") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+            }.body()
+
+            Log.d(TAG, "✅ Favorite toggled - isFavorite: ${response.isFavorite}")
+            ClothesResult.Success(response)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Toggle favorite failed: ${e.message}", e)
+            ClothesResult.Error(e.message ?: "Failed to toggle favorite")
+        }
     }
 
     suspend fun uploadClothing(imageBase64: String, processWithAI: Boolean): ClothesResult {
@@ -172,6 +240,7 @@ class ClothesApiService(private val tokenManager: TokenManager) {
                 originalImageUrl = null,
                 description = null,
                 isPublic = null,
+                isFavorite = null,
                 processingStatus = ProcessingStatus.COMPLETED,
                 processingError = null,
                 createdAt = null,
@@ -181,6 +250,49 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Delete failed: ${e.message}", e)
             ClothesResult.Error(e.message ?: "Delete failed")
+        }
+    }
+
+    // Função renomeada para evitar redeclaração — usa endpoint /clothes/add
+    suspend fun addClothing(
+        imageBase64: String,
+        name: String,
+        category: String,
+        color: String,
+        brand: String,
+        description: String?
+    ): ClothesResult {
+        return try {
+            Log.d(TAG, "=== Add Clothing (manual) ===")
+            Log.d(TAG, "Name: $name")
+            Log.d(TAG, "Category: $category")
+
+            val token = tokenManager.getAccessToken()
+            if (token == null) {
+                Log.e(TAG, "No token available")
+                return ClothesResult.Error("No authentication token")
+            }
+
+            val response: ClothingItem = client.post("$BASE_URL/clothes/add") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(mapOf(
+                    "name" to name,
+                    "category" to category,
+                    "color" to color,
+                    "brand" to brand,
+                    "clothingPictureUrl" to imageBase64,
+                    "description" to description,
+                    "isPublic" to true
+                ))
+            }.body()
+
+            Log.d(TAG, "✅ Add clothing successful - ID: ${response.id}")
+            ClothesResult.Success(response)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Add clothing failed: ${e.message}", e)
+            ClothesResult.Error(e.message ?: "Add clothing failed")
         }
     }
 }

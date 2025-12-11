@@ -40,15 +40,13 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.ocreaite.data.api.ClothesApiService
-import com.example.ocreaite.data.local.TokenManager
+import com.example.ocreaite.R
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
-import com.example.ocreaite.R
 
 @Composable
 fun AddItemsScreen(navController: NavController) {
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Camera roll, 1 = Database
+    var selectedTab by remember { mutableStateOf(0) }
     var selectedImages by remember { mutableStateOf(setOf<Uri>()) }
     var visible by remember { mutableStateOf(false) }
     var selectedAlbum by remember { mutableStateOf("All Photos") }
@@ -56,15 +54,10 @@ fun AddItemsScreen(navController: NavController) {
     var availableAlbums by remember { mutableStateOf<List<String>>(emptyList()) }
     var showAlbumDropdown by remember { mutableStateOf(false) }
     var hasPermission by remember { mutableStateOf(false) }
-    var processWithAI by remember { mutableStateOf(false) }
-    var isUploading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val tokenManager = remember { TokenManager(context) }
-    val apiService = remember { ClothesApiService(tokenManager) }
 
-    // Verificar permissão
     LaunchedEffect(Unit) {
         visible = true
         hasPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -80,7 +73,6 @@ fun AddItemsScreen(navController: NavController) {
         }
     }
 
-    // Launcher para solicitar permissão
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -92,10 +84,8 @@ fun AddItemsScreen(navController: NavController) {
         }
     }
 
-    // URI temporária para a câmera
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Launcher para abrir câmera
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -104,7 +94,6 @@ fun AddItemsScreen(navController: NavController) {
         }
     }
 
-    // Launcher para solicitar permissão de câmera
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -117,7 +106,6 @@ fun AddItemsScreen(navController: NavController) {
         }
     }
 
-    // Carregar imagens da galeria quando tiver permissão
     LaunchedEffect(hasPermission, selectedAlbum) {
         if (hasPermission) {
             loadAvailableAlbums(context) { albums ->
@@ -155,7 +143,6 @@ fun AddItemsScreen(navController: NavController) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.White,
@@ -196,14 +183,12 @@ fun AddItemsScreen(navController: NavController) {
                             }
                         }
 
-                        // Tabs
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            // Camera roll tab
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -244,7 +229,6 @@ fun AddItemsScreen(navController: NavController) {
                                     .background(Color(0xFFD9D9D9))
                             )
 
-                            // Database tab
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -279,7 +263,6 @@ fun AddItemsScreen(navController: NavController) {
                             }
                         }
 
-                        // Album selector (apenas no Camera roll)
                         if (selectedTab == 0) {
                             Box(
                                 modifier = Modifier
@@ -297,56 +280,9 @@ fun AddItemsScreen(navController: NavController) {
                                 )
                             }
                         }
-
-                        // ✨ NOVO: Toggle para processar com IA
-                        if (selectedTab == 0 && selectedImages.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFFF5F5F5))
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "✨",
-                                        fontSize = 20.sp
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = "Process with AI",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF121212)
-                                        )
-                                        Text(
-                                            text = "Remove background & enhance",
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF666666)
-                                        )
-                                    }
-                                }
-
-                                Switch(
-                                    checked = processWithAI,
-                                    onCheckedChange = { processWithAI = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0xFF121212),
-                                        uncheckedThumbColor = Color.White,
-                                        uncheckedTrackColor = Color(0xFFD9D9D9)
-                                    )
-                                )
-                            }
-                        }
                     }
                 }
 
-                // Content
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -393,7 +329,7 @@ fun AddItemsScreen(navController: NavController) {
                     }
                 }
 
-                // Bottom button
+                // ✅ NOVO: Bottom button agora navega para edição de metadados
                 if (selectedImages.isNotEmpty()) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -403,10 +339,7 @@ fun AddItemsScreen(navController: NavController) {
                         Button(
                             onClick = {
                                 scope.launch {
-                                    isUploading = true
-
                                     try {
-                                        // Converte as imagens para Base64
                                         val imagesBase64 = selectedImages.mapNotNull { uri ->
                                             uriToBase64(context, uri)
                                         }
@@ -417,47 +350,19 @@ fun AddItemsScreen(navController: NavController) {
                                                 "Failed to process images",
                                                 Toast.LENGTH_SHORT
                                             ).show()
-                                            isUploading = false
                                             return@launch
                                         }
 
-                                        // Upload em batch
-                                        val result = apiService.uploadBatch(imagesBase64, processWithAI)
+                                        // ✅ Salva no savedStateHandle e navega
+                                        navController.currentBackStackEntry
+                                            ?.savedStateHandle
+                                            ?.set("imageUris", selectedImages.toList())
 
-                                        when (result) {
-                                            is ClothesApiService.ClothesResult.BatchSuccess -> {
-                                                Toast.makeText(
-                                                    context,
-                                                    if (processWithAI) {
-                                                        "Uploading... Processing with AI in background"
-                                                    } else {
-                                                        "Upload successful!"
-                                                    },
-                                                    Toast.LENGTH_LONG
-                                                ).show()
+                                        navController.currentBackStackEntry
+                                            ?.savedStateHandle
+                                            ?.set("imagesBase64", imagesBase64)
 
-                                                // Navega para wardrobe
-                                                navController.navigate("wardrobe") {
-                                                    popUpTo("add") { inclusive = true }
-                                                }
-                                            }
-
-                                            is ClothesApiService.ClothesResult.Error -> {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Upload failed: ${result.message}",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            }
-
-                                            else -> {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Unexpected error",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        }
+                                        navController.navigate("edit_metadata")
 
                                     } catch (e: Exception) {
                                         Toast.makeText(
@@ -465,8 +370,6 @@ fun AddItemsScreen(navController: NavController) {
                                             "Error: ${e.message}",
                                             Toast.LENGTH_LONG
                                         ).show()
-                                    } finally {
-                                        isUploading = false
                                     }
                                 }
                             },
@@ -478,54 +381,19 @@ fun AddItemsScreen(navController: NavController) {
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF121212),
                                 contentColor = Color.White
-                            ),
-                            enabled = !isUploading
+                            )
                         ) {
-                            if (isUploading) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = if (processWithAI) {
-                                        "Upload & Process (${selectedImages.size})"
-                                    } else {
-                                        "Upload (${selectedImages.size})"
-                                    },
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                            Text(
+                                text = "Continue (${selectedImages.size})",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
             }
         }
 
-        // Loading overlay
-        if (isUploading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(color = Color.White)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Uploading...",
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
-                }
-            }
-        }
-
-        // Dropdown overlay
         if (showAlbumDropdown && selectedTab == 0) {
             Box(
                 modifier = Modifier
@@ -649,7 +517,6 @@ fun CameraRollContent(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Primeiro item - Botão da câmera
             item {
                 Box(
                     modifier = Modifier
@@ -667,7 +534,6 @@ fun CameraRollContent(
                 }
             }
 
-            // Imagens da galeria
             items(galleryImages.size) { index ->
                 val imageUri = galleryImages[index]
                 val isSelected = selectedImages.contains(imageUri)
@@ -734,7 +600,7 @@ fun DatabaseContent() {
                     .fillMaxWidth()
                     .height(120.dp)
                     .background(Color(0xFFE8E8E8), RoundedCornerShape(8.dp))
-                    .clickable { /* Selecionar item */ }
+                    .clickable { }
             ) {
                 Text(
                     text = "Item ${index + 1}",
@@ -747,14 +613,12 @@ fun DatabaseContent() {
     }
 }
 
-// Funções auxiliares
 private fun uriToBase64(context: android.content.Context, uri: Uri): String? {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri)
         val bitmap = BitmapFactory.decodeStream(inputStream)
         inputStream?.close()
 
-        // Redimensiona a imagem se for muito grande (max 1920px)
         val maxDimension = 1920
         val resizedBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
             val ratio = minOf(
@@ -871,6 +735,7 @@ private fun loadGalleryImages(context: android.content.Context, onImagesLoaded: 
     }
     onImagesLoaded(images)
 }
+
 private fun createImageUri(context: android.content.Context): Uri? {
     val contentResolver = context.contentResolver
     val contentValues = android.content.ContentValues().apply {
