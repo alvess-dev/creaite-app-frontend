@@ -1,6 +1,7 @@
-import kotlinx.serialization.Serializable
+// app/src/main/java/com/example/ocreaite/data/models/ClothingItem.kt
+package com.example.ocreaite.data.models
 
-// app/src/main/java/com/example/ocreaite/data/models/ClothingItem.kt (Atualizar enum)
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class ClothingItem(
@@ -20,11 +21,13 @@ data class ClothingItem(
     val updatedAt: String?
 )
 
+// ✅ ENUM CORRIGIDO - Sincronizado com o backend
+@Serializable
 enum class ProcessingStatus {
     PENDING,
     PROCESSING,
-    PROCESSING_AI,
-    REMOVING_BACKGROUND,
+    PROCESSING_AI,          // ✅ ADICIONADO
+    REMOVING_BACKGROUND,    // ✅ ADICIONADO
     COMPLETED,
     FAILED
 }

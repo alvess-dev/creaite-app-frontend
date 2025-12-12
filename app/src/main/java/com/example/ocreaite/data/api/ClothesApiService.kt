@@ -41,7 +41,6 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         data class Error(val message: String) : ClothesResult()
     }
 
-    // ✅ Upload avançado com metadados
     suspend fun uploadAdvanced(
         imageBase64: String,
         name: String,
@@ -85,7 +84,6 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         }
     }
 
-    // ✅ ADICIONADO: Método addClothing (alias para uploadAdvanced)
     suspend fun addClothing(
         imageBase64: String,
         name: String,
@@ -94,7 +92,6 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         brand: String,
         description: String?
     ): ClothesResult {
-        // Reutiliza o método uploadAdvanced
         return uploadAdvanced(
             imageBase64 = imageBase64,
             name = name,
@@ -103,6 +100,33 @@ class ClothesApiService(private val tokenManager: TokenManager) {
             brand = brand,
             description = description
         )
+    }
+
+    // ✅ ADICIONADO: Método uploadBatchAdvanced
+    suspend fun uploadBatchAdvanced(request: BatchAdvancedUploadRequest): ClothesResult {
+        return try {
+            Log.d(TAG, "=== Batch Advanced Upload ===")
+            Log.d(TAG, "Items: ${request.items.size}, AI: ${request.processWithAI}")
+
+            val token = tokenManager.getAccessToken()
+            if (token == null) {
+                Log.e(TAG, "No token available")
+                return ClothesResult.Error("No authentication token")
+            }
+
+            val response: BatchUploadResponse = client.post("$BASE_URL/clothes/upload/batch-advanced") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(request)
+            }.body()
+
+            Log.d(TAG, "✅ Batch advanced upload successful - ${response.totalUploaded} items")
+            ClothesResult.BatchSuccess(response)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Batch advanced upload failed: ${e.message}", e)
+            ClothesResult.Error(e.message ?: "Batch advanced upload failed")
+        }
     }
 
     suspend fun toggleFavorite(id: String): ClothesResult {
@@ -277,7 +301,6 @@ class ClothesApiService(private val tokenManager: TokenManager) {
     }
 }
 
-// ✅ Data class para serialização correta
 @Serializable
 data class AdvancedUploadRequest(
     val imageBase64: String,

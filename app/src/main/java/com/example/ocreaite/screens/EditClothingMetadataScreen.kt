@@ -37,6 +37,21 @@ import com.example.ocreaite.data.local.TokenManager
 import com.example.ocreaite.data.models.ClothingMetadata
 import kotlinx.coroutines.launch
 
+// Data classes para o request do batch (coloquei aqui para facilitar; se preferir mova para data.models)
+private data class BatchAdvancedItem(
+    val imageBase64: String,
+    val name: String?,
+    val category: String?,
+    val color: String?,
+    val brand: String?,
+    val description: String?
+)
+
+private data class BatchAdvancedUploadRequest(
+    val items: List<BatchAdvancedItem>,
+    val processWithAI: Boolean
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditClothingMetadataScreen(
@@ -75,7 +90,7 @@ fun EditClothingMetadataScreen(
     var showDropdown by remember { mutableStateOf(false) }
     var uploadProgress by remember { mutableStateOf(0) }
 
-    // ✅ NOVO: Estado para "Process with AI"
+    // Estado para "Process with AI"
     var processWithAI by remember { mutableStateOf(false) }
 
     val categories = listOf("SHIRT", "PANTS", "SHORTS", "SHOES", "HEADWEAR", "ACCESSORIES", "OUTERWEAR")
@@ -333,8 +348,7 @@ fun EditClothingMetadataScreen(
                 }
 
                 // ---------------------------
-                // ✅ NOVO: Toggle "Process with AI"
-                // Adicionado ANTES dos botões (dentro da Column de conteúdo)
+                // Toggle "Process with AI"
                 // ---------------------------
                 Column(
                     modifier = Modifier
@@ -396,13 +410,11 @@ fun EditClothingMetadataScreen(
                                 .padding(horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.logo),
-                                contentDescription = null,
-                                tint = Color(0xFF666666),
-                                modifier = Modifier.size(16.dp)
+                            Text(
+                                text = "ℹ️",
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(end = 8.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "AI processing may take 30-60 seconds per item",
                                 fontSize = 11.sp,
@@ -475,7 +487,7 @@ fun EditClothingMetadataScreen(
                             if (currentIndex < clothingItems.size - 1) {
                                 currentIndex++
                             } else {
-                                // ✅ MODIFICADO: Upload usando endpoint batch-advanced com flag processWithAI
+                                // Upload do batch (apenas UMA chamada)
                                 scope.launch {
                                     isUploading = true
                                     uploadProgress = 0
@@ -487,47 +499,47 @@ fun EditClothingMetadataScreen(
                                             Toast.LENGTH_SHORT
                                         ).show()
 
+                                        // Monta a lista de items (uma vez)
+                                        val batchItems = clothingItems.map { ci ->
+                                            BatchAdvancedItem(
+                                                imageBase64 = ci.imageBase64,
+                                                name = ci.name.ifEmpty { null },
+                                                category = ci.category.ifEmpty { null },
+                                                color = ci.color.ifEmpty { null },
+                                                brand = ci.brand.ifEmpty { null },
+                                                description = ci.description.ifEmpty { null }
+                                            )
+                                        }
+
+                                        val requestBody = BatchAdvancedUploadRequest(
+                                            items = batchItems,
+                                            processWithAI = processWithAI
+                                        )
+
+                                        // Executa uma única chamada para o batch
+                                        val result = try {
+                                            apiService.uploadBatchAdvanced(requestBody)
+                                        } catch (ex: Exception) {
+                                            ClothesApiService.ClothesResult.Error(ex.message ?: "Unknown error")
+                                        }
+
                                         var successCount = 0
                                         var failCount = 0
 
-                                        clothingItems.forEachIndexed { index, item ->
-                                            val result = try {
-                                                // Usa batch-advanced com o flag processWithAI
-                                                val requestBody = mapOf(
-                                                    "items" to clothingItems.map { clothingItem ->
-                                                        mapOf(
-                                                            "imageBase64" to clothingItem.imageBase64,
-                                                            "name" to clothingItem.name,
-                                                            "category" to clothingItem.category,
-                                                            "color" to clothingItem.color,
-                                                            "brand" to clothingItem.brand,
-                                                            "description" to (clothingItem.description.ifEmpty { null })
-                                                        )
-                                                    },
-                                                    "processWithAI" to processWithAI
-                                                )
-
-                                                apiService.uploadBatchAdvanced(requestBody)
-                                            } catch (ex: Exception) {
-                                                ClothesApiService.ClothesResult.Error(ex.message ?: "Unknown error")
+                                        when (result) {
+                                            is ClothesApiService.ClothesResult.BatchSuccess -> {
+                                                // Ajuste com base na estrutura real da sua resposta
+                                                successCount = result.response.totalUploaded
+                                                // Atualiza progresso para completar
+                                                uploadProgress = totalToUpload
                                             }
-
-                                            when (result) {
-                                                is ClothesApiService.ClothesResult.BatchSuccess -> {
-                                                    successCount = result.response.totalUploaded
-                                                }
-                                                is ClothesApiService.ClothesResult.Error -> {
-                                                    failCount++
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Failed: ${result.message}",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                }
-                                                else -> {}
+                                            is ClothesApiService.ClothesResult.Error -> {
+                                                failCount = totalToUpload
+                                                Toast.makeText(context, "Failed: ${result.message}", Toast.LENGTH_LONG).show()
                                             }
-
-                                            uploadProgress = index + 1
+                                            else -> {
+                                                Toast.makeText(context, "Unexpected response from server", Toast.LENGTH_LONG).show()
+                                            }
                                         }
 
                                         val processingMsg = if (processWithAI) {
@@ -538,7 +550,7 @@ fun EditClothingMetadataScreen(
 
                                         Toast.makeText(
                                             context,
-                                            "Upload complete: $successCount success$processingMsg",
+                                            "Upload complete: $successCount success, $failCount failed.$processingMsg",
                                             Toast.LENGTH_LONG
                                         ).show()
 

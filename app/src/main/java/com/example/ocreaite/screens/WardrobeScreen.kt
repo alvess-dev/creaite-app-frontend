@@ -201,7 +201,7 @@ fun WardrobeScreen(navController: NavController) {
 
                         else -> {
                             if (filteredItems.isEmpty()) {
-                                // Estado vazio melhorado
+                                // Estado vazio
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
@@ -322,8 +322,12 @@ fun ClothingItemCard(
                 ),
             contentAlignment = Alignment.Center
         ) {
+            // ✅ CORRIGIDO: Usando os novos estados do enum
             when (item.processingStatus) {
-                ProcessingStatus.PENDING, ProcessingStatus.PROCESSING -> {
+                ProcessingStatus.PENDING,
+                ProcessingStatus.PROCESSING,
+                ProcessingStatus.PROCESSING_AI,
+                ProcessingStatus.REMOVING_BACKGROUND -> {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
@@ -334,9 +338,15 @@ fun ClothingItemCard(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Processing...",
-                            fontSize = 12.sp,
-                            color = Color(0xFF666666)
+                            text = when (item.processingStatus) {
+                                ProcessingStatus.PROCESSING_AI -> "Enhancing with AI..."
+                                ProcessingStatus.REMOVING_BACKGROUND -> "Removing background..."
+                                else -> "Processing..."
+                            },
+                            fontSize = 11.sp,
+                            color = Color(0xFF666666),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
                 }
@@ -372,7 +382,7 @@ fun ClothingItemCard(
             }
         }
 
-        // Coração favorito (outline/preenchido)
+        // Coração favorito
         val favoriteInteractionSource = remember { MutableInteractionSource() }
         val isFavoritePressed by favoriteInteractionSource.collectIsPressedAsState()
         val favoriteScale by animateFloatAsState(
