@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,22 +34,9 @@ import coil.request.ImageRequest
 import com.example.ocreaite.data.api.ClothesApiService
 import com.example.ocreaite.data.local.TokenManager
 import com.example.ocreaite.data.models.ClothingMetadata
+import com.example.ocreaite.data.models.BatchAdvancedUploadRequest
+import com.example.ocreaite.data.models.BatchAdvancedItem
 import kotlinx.coroutines.launch
-
-// Data classes para o request do batch (coloquei aqui para facilitar; se preferir mova para data.models)
-private data class BatchAdvancedItem(
-    val imageBase64: String,
-    val name: String?,
-    val category: String?,
-    val color: String?,
-    val brand: String?,
-    val description: String?
-)
-
-private data class BatchAdvancedUploadRequest(
-    val items: List<BatchAdvancedItem>,
-    val processWithAI: Boolean
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -347,9 +333,7 @@ fun EditClothingMetadataScreen(
                     )
                 }
 
-                // ---------------------------
                 // Toggle "Process with AI"
-                // ---------------------------
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -423,7 +407,6 @@ fun EditClothingMetadataScreen(
                         }
                     }
                 }
-                // ---------------------------
             }
 
             // Bottom buttons
@@ -499,14 +482,14 @@ fun EditClothingMetadataScreen(
                                             Toast.LENGTH_SHORT
                                         ).show()
 
-                                        // Monta a lista de items (uma vez)
+                                        // ✅ CORRIGIDO: Usa valores não-null para campos obrigatórios
                                         val batchItems = clothingItems.map { ci ->
                                             BatchAdvancedItem(
                                                 imageBase64 = ci.imageBase64,
-                                                name = ci.name.ifEmpty { null },
-                                                category = ci.category.ifEmpty { null },
-                                                color = ci.color.ifEmpty { null },
-                                                brand = ci.brand.ifEmpty { null },
+                                                name = ci.name.ifEmpty { "New Item" },
+                                                category = ci.category.ifEmpty { "SHIRT" },
+                                                color = ci.color.ifEmpty { "Unknown" },
+                                                brand = ci.brand.ifEmpty { "Unknown" },
                                                 description = ci.description.ifEmpty { null }
                                             )
                                         }
@@ -528,9 +511,7 @@ fun EditClothingMetadataScreen(
 
                                         when (result) {
                                             is ClothesApiService.ClothesResult.BatchSuccess -> {
-                                                // Ajuste com base na estrutura real da sua resposta
                                                 successCount = result.response.totalUploaded
-                                                // Atualiza progresso para completar
                                                 uploadProgress = totalToUpload
                                             }
                                             is ClothesApiService.ClothesResult.Error -> {
