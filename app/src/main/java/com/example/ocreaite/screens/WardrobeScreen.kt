@@ -51,33 +51,10 @@ fun WardrobeScreen(navController: NavController) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    var favorites by remember { mutableStateOf(setOf<String>()) }
 
-    // ✅ NOVO: Sistema de polling para atualizar status
     LaunchedEffect(Unit) {
         visible = true
         viewModel.loadUserClothes()
-    }
-
-    // ✅ NOVO: Polling automático para itens em processamento
-    LaunchedEffect(clothesState) {
-        if (clothesState is WardrobeViewModel.ClothesState.Success) {
-            val items = (clothesState as WardrobeViewModel.ClothesState.Success).items
-            val hasProcessing = items.any {
-                it.processingStatus in listOf(
-                    ProcessingStatus.PENDING,
-                    ProcessingStatus.PROCESSING,
-                    ProcessingStatus.PROCESSING_AI,
-                    ProcessingStatus.REMOVING_BACKGROUND
-                )
-            }
-
-            if (hasProcessing) {
-                // Recarrega a cada 5 segundos se houver itens processando
-                kotlinx.coroutines.delay(5000)
-                viewModel.loadUserClothes(selectedCategory)
-            }
-        }
     }
 
     LaunchedEffect(selectedCategory) {
@@ -197,65 +174,6 @@ fun WardrobeScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ✅ NOVO: Indicador global de processamento (aparece no topo do conteúdo)
-                    val processingCount = clothingItems.count {
-                        it.processingStatus in listOf(
-                            ProcessingStatus.PENDING,
-                            ProcessingStatus.PROCESSING,
-                            ProcessingStatus.PROCESSING_AI,
-                            ProcessingStatus.REMOVING_BACKGROUND
-                        )
-                    }
-
-                    if (processingCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 8.dp)
-                        ) {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = Color(0xFF121212),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        color = Color.White,
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
-                                    )
-
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            text = "Processing $processingCount ${if (processingCount == 1) "item" else "items"}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = "Your items are being enhanced",
-                                            fontSize = 12.sp,
-                                            color = Color.White.copy(alpha = 0.7f)
-                                        )
-                                    }
-
-                                    Text(
-                                        text = "🎨",
-                                        fontSize = 20.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
                     // Content
                     when (clothesState) {
                         is WardrobeViewModel.ClothesState.Loading -> {
@@ -351,14 +269,9 @@ fun WardrobeScreen(navController: NavController) {
                                     items(filteredItems) { item ->
                                         ClothingItemCard(
                                             item = item,
-                                            isFavorite = favorites.contains(item.id),
+                                            isFavorite = item.isFavorite ?: false,
                                             onFavoriteClick = {
-                                                favorites = if (favorites.contains(item.id)) {
-                                                    favorites - item.id
-                                                } else {
-                                                    favorites + item.id
-                                                }
-                                                // TODO: Enviar para o banco
+                                                viewModel.toggleFavorite(item.id)
                                             },
                                             onDelete = { viewModel.deleteClothing(item.id) },
                                             onClick = { /* TODO: Navigate to item detail */ }
@@ -410,34 +323,22 @@ fun ClothingItemCard(
             contentAlignment = Alignment.Center
         ) {
             when (item.processingStatus) {
-                ProcessingStatus.PENDING -> {
-                    ProcessingIndicator(
-                        text = "Processing...",
-                        icon = null
-                    )
-                }
-
-                ProcessingStatus.PROCESSING -> {
-                    ProcessingIndicator(
-                        text = "Processing...",
-                        icon = null
-                    )
-                }
-
-                ProcessingStatus.PROCESSING_AI -> {
-                    ProcessingIndicator(
-                        text = "Processing with AI ✨",
-                        subtext = "This may take 30-60s",
-                        icon = R.drawable.logo
-                    )
-                }
-
-                ProcessingStatus.REMOVING_BACKGROUND -> {
-                    ProcessingIndicator(
-                        text = "Removing background",
-                        subtext = "Almost done...",
-                        icon = null
-                    )
+                ProcessingStatus.PENDING, ProcessingStatus.PROCESSING -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF121212),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Processing...",
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    }
                 }
 
                 ProcessingStatus.FAILED -> {
@@ -471,102 +372,36 @@ fun ClothingItemCard(
             }
         }
 
-        // Coração favorito (só mostra se completed)
-        if (item.processingStatus == ProcessingStatus.COMPLETED) {
-            val favoriteInteractionSource = remember { MutableInteractionSource() }
-            val isFavoritePressed by favoriteInteractionSource.collectIsPressedAsState()
-            val favoriteScale by animateFloatAsState(
-                targetValue = if (isFavoritePressed) 0.85f else 1f,
-                animationSpec = tween(100)
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(32.dp)
-                    .graphicsLayer {
-                        scaleX = favoriteScale
-                        scaleY = favoriteScale
-                    }
-                    .background(Color.White.copy(alpha = 0.9f), CircleShape)
-                    .clickable(
-                        interactionSource = favoriteInteractionSource,
-                        indication = null,
-                        onClick = onFavoriteClick
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Favorite",
-                    tint = if (isFavorite) Color(0xFFFF6B6B) else Color(0xFF121212),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ProcessingIndicator(
-    text: String,
-    subtext: String? = null,
-    icon: Int? = null
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(16.dp)
-    ) {
-        // Ícone animado (se houver)
-        if (icon != null) {
-            val infiniteTransition = rememberInfiniteTransition(label = "iconPulse")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 1.1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "scale"
-            )
-
-            Icon(
-                painter = painterResource(id = icon),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(32.dp)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                tint = Color(0xFF121212)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-        } else {
-            CircularProgressIndicator(
-                color = Color(0xFF121212),
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF121212),
-            textAlign = TextAlign.Center
+        // Coração favorito (outline/preenchido)
+        val favoriteInteractionSource = remember { MutableInteractionSource() }
+        val isFavoritePressed by favoriteInteractionSource.collectIsPressedAsState()
+        val favoriteScale by animateFloatAsState(
+            targetValue = if (isFavoritePressed) 0.85f else 1f,
+            animationSpec = tween(100)
         )
 
-        if (subtext != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtext,
-                fontSize = 10.sp,
-                color = Color(0xFF666666),
-                textAlign = TextAlign.Center
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(32.dp)
+                .graphicsLayer {
+                    scaleX = favoriteScale
+                    scaleY = favoriteScale
+                }
+                .background(Color.White.copy(alpha = 0.9f), CircleShape)
+                .clickable(
+                    interactionSource = favoriteInteractionSource,
+                    indication = null,
+                    onClick = onFavoriteClick
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = "Favorite",
+                tint = if (isFavorite) Color(0xFFFF6B6B) else Color(0xFF121212),
+                modifier = Modifier.size(18.dp)
             )
         }
     }
