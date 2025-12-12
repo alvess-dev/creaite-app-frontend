@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +74,9 @@ fun EditClothingMetadataScreen(
     var isUploading by remember { mutableStateOf(false) }
     var showDropdown by remember { mutableStateOf(false) }
     var uploadProgress by remember { mutableStateOf(0) }
+
+    // ✅ NOVO: Estado para "Process with AI"
+    var processWithAI by remember { mutableStateOf(false) }
 
     val categories = listOf("SHIRT", "PANTS", "SHORTS", "SHOES", "HEADWEAR", "ACCESSORIES", "OUTERWEAR")
     val totalToUpload = clothingItems.size
@@ -327,6 +331,87 @@ fun EditClothingMetadataScreen(
                         shape = RoundedCornerShape(8.dp)
                     )
                 }
+
+                // ---------------------------
+                // ✅ NOVO: Toggle "Process with AI"
+                // Adicionado ANTES dos botões (dentro da Column de conteúdo)
+                // ---------------------------
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFFF5F5F5),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "Process with AI ✨",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF121212)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Enhance image quality with professional AI processing",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF666666),
+                                    lineHeight = 16.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Switch(
+                                checked = processWithAI,
+                                onCheckedChange = { processWithAI = it },
+                                enabled = !isUploading,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFF121212),
+                                    uncheckedThumbColor = Color.White,
+                                    uncheckedTrackColor = Color(0xFFD9D9D9)
+                                )
+                            )
+                        }
+                    }
+
+                    // Info adicional
+                    if (processWithAI) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.logo),
+                                contentDescription = null,
+                                tint = Color(0xFF666666),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "AI processing may take 30-60 seconds per item",
+                                fontSize = 11.sp,
+                                color = Color(0xFF666666)
+                            )
+                        }
+                    }
+                }
+                // ---------------------------
             }
 
             // Bottom buttons
@@ -390,14 +475,15 @@ fun EditClothingMetadataScreen(
                             if (currentIndex < clothingItems.size - 1) {
                                 currentIndex++
                             } else {
-                                // ✅ CORRIGIDO: Upload usando endpoint correto
+                                // ✅ MODIFICADO: Upload usando endpoint batch-advanced com flag processWithAI
                                 scope.launch {
                                     isUploading = true
                                     uploadProgress = 0
                                     try {
+                                        val aiText = if (processWithAI) " with AI enhancement" else ""
                                         Toast.makeText(
                                             context,
-                                            "Starting upload of ${clothingItems.size} items...",
+                                            "Starting upload of ${clothingItems.size} items$aiText...",
                                             Toast.LENGTH_SHORT
                                         ).show()
 
@@ -406,25 +492,35 @@ fun EditClothingMetadataScreen(
 
                                         clothingItems.forEachIndexed { index, item ->
                                             val result = try {
-                                                apiService.uploadAdvanced(
-                                                    imageBase64 = item.imageBase64,
-                                                    name = item.name,
-                                                    category = item.category,
-                                                    color = item.color,
-                                                    brand = item.brand,
-                                                    description = item.description.ifEmpty { null }
+                                                // Usa batch-advanced com o flag processWithAI
+                                                val requestBody = mapOf(
+                                                    "items" to clothingItems.map { clothingItem ->
+                                                        mapOf(
+                                                            "imageBase64" to clothingItem.imageBase64,
+                                                            "name" to clothingItem.name,
+                                                            "category" to clothingItem.category,
+                                                            "color" to clothingItem.color,
+                                                            "brand" to clothingItem.brand,
+                                                            "description" to (clothingItem.description.ifEmpty { null })
+                                                        )
+                                                    },
+                                                    "processWithAI" to processWithAI
                                                 )
+
+                                                apiService.uploadBatchAdvanced(requestBody)
                                             } catch (ex: Exception) {
                                                 ClothesApiService.ClothesResult.Error(ex.message ?: "Unknown error")
                                             }
 
                                             when (result) {
-                                                is ClothesApiService.ClothesResult.Success -> successCount++
+                                                is ClothesApiService.ClothesResult.BatchSuccess -> {
+                                                    successCount = result.response.totalUploaded
+                                                }
                                                 is ClothesApiService.ClothesResult.Error -> {
                                                     failCount++
                                                     Toast.makeText(
                                                         context,
-                                                        "Failed item ${index + 1}: ${result.message}",
+                                                        "Failed: ${result.message}",
                                                         Toast.LENGTH_LONG
                                                     ).show()
                                                 }
@@ -434,9 +530,15 @@ fun EditClothingMetadataScreen(
                                             uploadProgress = index + 1
                                         }
 
+                                        val processingMsg = if (processWithAI) {
+                                            "\n\nItems are being processed with AI in the background."
+                                        } else {
+                                            "\n\nItems are being processed in the background."
+                                        }
+
                                         Toast.makeText(
                                             context,
-                                            "Upload complete: $successCount success, $failCount failed",
+                                            "Upload complete: $successCount success$processingMsg",
                                             Toast.LENGTH_LONG
                                         ).show()
 
