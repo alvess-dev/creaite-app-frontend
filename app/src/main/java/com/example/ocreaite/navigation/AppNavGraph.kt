@@ -100,11 +100,31 @@ fun AppNavGraph(navController: NavHostController, activity: MainActivity? = null
             AddItemsScreen(navController)
         }
 
-        // ✅ NOVO: Tela de edição de metadados
+        // ✅ CORRIGIDO: Tela de edição de metadados
         composable("edit_metadata") {
+            // recupera o previousBackStackEntry (onde salvamos os dados antes de navegar)
             val previousEntry = navController.previousBackStackEntry
-            val imageUris = previousEntry?.savedStateHandle?.get<List<Uri>>("imageUris") ?: emptyList()
-            val imagesBase64 = previousEntry?.savedStateHandle?.get<List<String>>("imagesBase64") ?: emptyList()
+
+            // usamos ArrayList<String> porque foi o que salvamos (strings das URIs)
+            val uriStrings = previousEntry
+                ?.savedStateHandle
+                ?.get<ArrayList<String>>("imageUriStrings")
+                ?: arrayListOf()
+
+            // converte para Uri
+            val imageUris: List<Uri> = uriStrings.map { Uri.parse(it) }
+
+            // recupera os base64 (se houver)
+            val imagesBase64 = previousEntry
+                ?.savedStateHandle
+                ?.get<ArrayList<String>>("imagesBase64")
+                ?: arrayListOf()
+
+            EditClothingMetadataScreen(
+                navController = navController,
+                imageUris = imageUris,
+                imagesBase64 = imagesBase64
+            )
         }
     }
 }

@@ -33,17 +33,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.ocreaite.data.api.ClothesApiService
 import com.example.ocreaite.data.local.TokenManager
+import com.example.ocreaite.data.models.ClothingMetadata
 import kotlinx.coroutines.launch
-
-data class ClothingMetadata(
-    val imageUri: Uri,
-    val imageBase64: String,
-    var name: String = "New Item",
-    var category: String = "SHIRT",
-    var color: String = "Unknown",
-    var brand: String = "Unknown",
-    var description: String = ""
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +47,15 @@ fun EditClothingMetadataScreen(
     val scope = rememberCoroutineScope()
     val tokenManager = remember { TokenManager(context) }
     val apiService = remember { ClothesApiService(tokenManager) }
+
+    // Validação de entrada
+    if (imageUris.isEmpty() || imagesBase64.isEmpty()) {
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, "No images to process", Toast.LENGTH_SHORT).show()
+            navController.popBackStack()
+        }
+        return
+    }
 
     // Estado para cada roupa
     var clothingItems by remember {
@@ -76,7 +76,7 @@ fun EditClothingMetadataScreen(
 
     val categories = listOf("SHIRT", "PANTS", "SHORTS", "SHOES", "HEADWEAR", "ACCESSORIES", "OUTERWEAR")
     val totalToUpload = clothingItems.size
-    val currentItem = clothingItems.getOrNull(currentIndex) ?: ClothingMetadata(Uri.EMPTY, "")
+    val currentItem = clothingItems.getOrNull(currentIndex) ?: return
 
     Box(
         modifier = Modifier
@@ -98,7 +98,12 @@ fun EditClothingMetadataScreen(
                         .padding(horizontal = 16.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { if (!isUploading) navController.popBackStack() }) {
+                    IconButton(
+                        onClick = {
+                            if (!isUploading) navController.popBackStack()
+                        },
+                        enabled = !isUploading
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -163,6 +168,7 @@ fun EditClothingMetadataScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Item name", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -188,8 +194,11 @@ fun EditClothingMetadataScreen(
                             onValueChange = {},
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { if (!isUploading) showDropdown = !showDropdown },
+                                .clickable(enabled = !isUploading) {
+                                    showDropdown = !showDropdown
+                                },
                             readOnly = true,
+                            enabled = false,
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
@@ -206,7 +215,7 @@ fun EditClothingMetadataScreen(
                         )
 
                         DropdownMenu(
-                            expanded = showDropdown,
+                            expanded = showDropdown && !isUploading,
                             onDismissRequest = { showDropdown = false },
                             modifier = Modifier.fillMaxWidth(0.9f)
                         ) {
@@ -249,6 +258,7 @@ fun EditClothingMetadataScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Color", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -277,6 +287,7 @@ fun EditClothingMetadataScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Brand", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -307,6 +318,7 @@ fun EditClothingMetadataScreen(
                             .height(120.dp),
                         placeholder = { Text("Add details about this item", color = Color.Gray) },
                         maxLines = 5,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -335,7 +347,8 @@ fun EditClothingMetadataScreen(
                         val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
                         val prevScale by animateFloatAsState(
                             targetValue = if (isPrevPressed) 0.95f else 1f,
-                            animationSpec = tween(100)
+                            animationSpec = tween(100),
+                            label = "prevScale"
                         )
 
                         Button(
@@ -352,7 +365,8 @@ fun EditClothingMetadataScreen(
                                 contentColor = Color(0xFF121212)
                             ),
                             shape = RoundedCornerShape(28.dp),
-                            interactionSource = prevInteractionSource
+                            interactionSource = prevInteractionSource,
+                            enabled = !isUploading
                         ) {
                             Text(
                                 "Previous",
@@ -367,7 +381,8 @@ fun EditClothingMetadataScreen(
                     val isNextPressed by nextInteractionSource.collectIsPressedAsState()
                     val nextScale by animateFloatAsState(
                         targetValue = if (isNextPressed) 0.95f else 1f,
-                        animationSpec = tween(100)
+                        animationSpec = tween(100),
+                        label = "nextScale"
                     )
 
                     Button(
@@ -375,7 +390,7 @@ fun EditClothingMetadataScreen(
                             if (currentIndex < clothingItems.size - 1) {
                                 currentIndex++
                             } else {
-                                // Upload todos - implementação real
+                                // Upload todos
                                 scope.launch {
                                     isUploading = true
                                     uploadProgress = 0
@@ -397,7 +412,7 @@ fun EditClothingMetadataScreen(
                                                     category = item.category,
                                                     color = item.color,
                                                     brand = item.brand,
-                                                    description = item.description
+                                                    description = item.description.ifEmpty { null }
                                                 )
                                             } catch (ex: Exception) {
                                                 ClothesApiService.ClothesResult.Error(ex.message ?: "Unknown error")
@@ -409,7 +424,7 @@ fun EditClothingMetadataScreen(
                                                     failCount++
                                                     Toast.makeText(
                                                         context,
-                                                        "Falha no item ${index + 1}: ${result.message}",
+                                                        "Failed item ${index + 1}: ${result.message}",
                                                         Toast.LENGTH_LONG
                                                     ).show()
                                                 }
@@ -421,7 +436,7 @@ fun EditClothingMetadataScreen(
 
                                         Toast.makeText(
                                             context,
-                                            "Upload finalizado: $successCount sucesso(s), $failCount falha(s).",
+                                            "Upload complete: $successCount success, $failCount failed",
                                             Toast.LENGTH_LONG
                                         ).show()
 
@@ -430,7 +445,11 @@ fun EditClothingMetadataScreen(
                                         }
 
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Error: ${e.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     } finally {
                                         isUploading = false
                                         uploadProgress = 0

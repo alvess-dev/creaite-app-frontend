@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/ocreaite/screens/EditClothingMetadataScreen.kt
+// app/src/main/java/com/example/ocreaite/screens/EditClothingScreen.kt
 package com.example.ocreaite.screens
 
 import android.net.Uri
@@ -33,25 +33,29 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.ocreaite.data.api.ClothesApiService
 import com.example.ocreaite.data.local.TokenManager
+import com.example.ocreaite.data.models.ClothingMetadata
 import kotlinx.coroutines.launch
-
-data class ClothingMetadata(
-    val imageUri: Uri,
-    val imageBase64: String,
-    var name: String = "New Item",
-    var category: String = "SHIRT",
-    var color: String = "Unknown",
-    var brand: String = "Unknown",
-    var description: String = ""
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
- {
+fun EditClothingScreen(
+    navController: NavController,
+    imageUris: List<Uri>,
+    imagesBase64: List<String>
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val tokenManager = remember { TokenManager(context) }
     val apiService = remember { ClothesApiService(tokenManager) }
+
+    // Validação de entrada
+    if (imageUris.isEmpty() || imagesBase64.isEmpty()) {
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, "No images to process", Toast.LENGTH_SHORT).show()
+            navController.popBackStack()
+        }
+        return
+    }
 
     // Estado para cada roupa
     var clothingItems by remember {
@@ -59,7 +63,7 @@ data class ClothingMetadata(
             imageUris.mapIndexed { index, uri ->
                 ClothingMetadata(
                     imageUri = uri,
-                    imageBase64 = imagesBase64[index]
+                    imageBase64 = imagesBase64.getOrElse(index) { "" }
                 )
             }
         )
@@ -68,9 +72,11 @@ data class ClothingMetadata(
     var currentIndex by remember { mutableStateOf(0) }
     var isUploading by remember { mutableStateOf(false) }
     var showDropdown by remember { mutableStateOf(false) }
+    var uploadProgress by remember { mutableStateOf(0) }
 
     val categories = listOf("SHIRT", "PANTS", "SHORTS", "SHOES", "HEADWEAR", "ACCESSORIES", "OUTERWEAR")
-    val currentItem = clothingItems[currentIndex]
+    val totalToUpload = clothingItems.size
+    val currentItem = clothingItems.getOrNull(currentIndex) ?: return
 
     Box(
         modifier = Modifier
@@ -92,7 +98,10 @@ data class ClothingMetadata(
                         .padding(horizontal = 16.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(
+                        onClick = { if (!isUploading) navController.popBackStack() },
+                        enabled = !isUploading
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
@@ -157,6 +166,7 @@ data class ClothingMetadata(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Item name", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -182,7 +192,10 @@ data class ClothingMetadata(
                             onValueChange = {},
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showDropdown = !showDropdown },
+                                .clickable(enabled = !isUploading) {
+                                    showDropdown = !showDropdown
+                                },
+                            readOnly = true,
                             enabled = false,
                             trailingIcon = {
                                 Icon(
@@ -199,7 +212,7 @@ data class ClothingMetadata(
                         )
 
                         DropdownMenu(
-                            expanded = showDropdown,
+                            expanded = showDropdown && !isUploading,
                             onDismissRequest = { showDropdown = false },
                             modifier = Modifier.fillMaxWidth(0.9f)
                         ) {
@@ -242,6 +255,7 @@ data class ClothingMetadata(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Color", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -270,6 +284,7 @@ data class ClothingMetadata(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Brand", color = Color.Gray) },
                         singleLine = true,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -300,6 +315,7 @@ data class ClothingMetadata(
                             .height(120.dp),
                         placeholder = { Text("Add details about this item", color = Color.Gray) },
                         maxLines = 5,
+                        enabled = !isUploading,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF121212),
                             unfocusedBorderColor = Color(0xFFD9D9D9),
@@ -328,11 +344,12 @@ data class ClothingMetadata(
                         val isPrevPressed by prevInteractionSource.collectIsPressedAsState()
                         val prevScale by animateFloatAsState(
                             targetValue = if (isPrevPressed) 0.95f else 1f,
-                            animationSpec = tween(100)
+                            animationSpec = tween(100),
+                            label = "prevScale"
                         )
 
                         Button(
-                            onClick = { currentIndex-- },
+                            onClick = { if (!isUploading) currentIndex-- },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
@@ -345,7 +362,8 @@ data class ClothingMetadata(
                                 contentColor = Color(0xFF121212)
                             ),
                             shape = RoundedCornerShape(28.dp),
-                            interactionSource = prevInteractionSource
+                            interactionSource = prevInteractionSource,
+                            enabled = !isUploading
                         ) {
                             Text(
                                 "Previous",
@@ -360,7 +378,8 @@ data class ClothingMetadata(
                     val isNextPressed by nextInteractionSource.collectIsPressedAsState()
                     val nextScale by animateFloatAsState(
                         targetValue = if (isNextPressed) 0.95f else 1f,
-                        animationSpec = tween(100)
+                        animationSpec = tween(100),
+                        label = "nextScale"
                     )
 
                     Button(
@@ -371,26 +390,57 @@ data class ClothingMetadata(
                                 // Upload todos
                                 scope.launch {
                                     isUploading = true
+                                    uploadProgress = 0
                                     try {
-                                        // TODO: Implementar upload batch avançado
                                         Toast.makeText(
                                             context,
-                                            "Uploading ${clothingItems.size} items...",
+                                            "Starting upload of ${clothingItems.size} items...",
                                             Toast.LENGTH_SHORT
                                         ).show()
 
-                                        // Simula upload
-                                        kotlinx.coroutines.delay(2000)
+                                        var successCount = 0
+                                        var failCount = 0
+
+                                        clothingItems.forEachIndexed { index, item ->
+                                            val result = try {
+                                                apiService.addClothing(
+                                                    imageBase64 = item.imageBase64,
+                                                    name = item.name,
+                                                    category = item.category,
+                                                    color = item.color,
+                                                    brand = item.brand,
+                                                    description = item.description.ifEmpty { null }
+                                                )
+                                            } catch (ex: Exception) {
+                                                ClothesApiService.ClothesResult.Error(ex.message ?: "Unknown error")
+                                            }
+
+                                            when (result) {
+                                                is ClothesApiService.ClothesResult.Success -> successCount++
+                                                is ClothesApiService.ClothesResult.Error -> {
+                                                    failCount++
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Failed item ${index + 1}: ${result.message}",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                                else -> {}
+                                            }
+
+                                            uploadProgress = index + 1
+                                        }
 
                                         Toast.makeText(
                                             context,
-                                            "All items uploaded!",
+                                            "Upload complete: $successCount success, $failCount failed",
                                             Toast.LENGTH_LONG
                                         ).show()
 
                                         navController.navigate("wardrobe") {
                                             popUpTo("add") { inclusive = true }
                                         }
+
                                     } catch (e: Exception) {
                                         Toast.makeText(
                                             context,
@@ -399,6 +449,7 @@ data class ClothingMetadata(
                                         ).show()
                                     } finally {
                                         isUploading = false
+                                        uploadProgress = 0
                                     }
                                 }
                             }
@@ -435,7 +486,7 @@ data class ClothingMetadata(
             }
         }
 
-        // Loading overlay
+        // Loading overlay com progresso
         if (isUploading) {
             Box(
                 modifier = Modifier
@@ -449,7 +500,7 @@ data class ClothingMetadata(
                     CircularProgressIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Uploading...",
+                        "Uploading... ($uploadProgress / $totalToUpload)",
                         color = Color.White,
                         fontSize = 16.sp
                     )

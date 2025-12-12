@@ -14,12 +14,10 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -340,11 +338,14 @@ fun AddItemsScreen(navController: NavController) {
                             onClick = {
                                 scope.launch {
                                     try {
+                                        // Converte URIs para strings (mais seguro para savedStateHandle)
+                                        val uriStrings = selectedImages.map { it.toString() }
+                                        // Converte imagens para base64 (pode demorar; você pode optar por só passar URIs)
                                         val imagesBase64 = selectedImages.mapNotNull { uri ->
                                             uriToBase64(context, uri)
                                         }
 
-                                        if (imagesBase64.isEmpty()) {
+                                        if (uriStrings.isEmpty()) {
                                             Toast.makeText(
                                                 context,
                                                 "Failed to process images",
@@ -353,17 +354,18 @@ fun AddItemsScreen(navController: NavController) {
                                             return@launch
                                         }
 
-                                        // ✅ Salva no savedStateHandle e navega
-                                        navController.currentBackStackEntry
-                                            ?.savedStateHandle
-                                            ?.set("imageUris", selectedImages.toList())
+                                        // Salva no savedStateHandle da entrada atual para que a tela destino recupere
+                                        navController.currentBackStackEntry?.savedStateHandle?.set(
+                                            "imageUriStrings",
+                                            ArrayList(uriStrings)
+                                        )
+                                        navController.currentBackStackEntry?.savedStateHandle?.set(
+                                            "imagesBase64",
+                                            ArrayList(imagesBase64)
+                                        )
 
-                                        navController.currentBackStackEntry
-                                            ?.savedStateHandle
-                                            ?.set("imagesBase64", imagesBase64)
-
+                                        // Navega para a rota já declarada no AppNavGraph
                                         navController.navigate("edit_metadata")
-
                                     } catch (e: Exception) {
                                         Toast.makeText(
                                             context,
