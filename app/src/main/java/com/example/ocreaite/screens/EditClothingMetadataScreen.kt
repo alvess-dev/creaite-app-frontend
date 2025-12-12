@@ -390,7 +390,7 @@ fun EditClothingMetadataScreen(
                             if (currentIndex < clothingItems.size - 1) {
                                 currentIndex++
                             } else {
-                                // Upload todos
+                                // ✅ CORRIGIDO: Upload usando endpoint correto
                                 scope.launch {
                                     isUploading = true
                                     uploadProgress = 0
@@ -406,7 +406,7 @@ fun EditClothingMetadataScreen(
 
                                         clothingItems.forEachIndexed { index, item ->
                                             val result = try {
-                                                apiService.addClothing(
+                                                apiService.uploadAdvanced(
                                                     imageBase64 = item.imageBase64,
                                                     name = item.name,
                                                     category = item.category,

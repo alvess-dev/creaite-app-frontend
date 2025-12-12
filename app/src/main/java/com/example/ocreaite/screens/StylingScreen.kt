@@ -71,33 +71,42 @@ fun StylingScreen(navController: NavController) {
         else -> emptyList()
     }
 
-    // Agrupa as roupas por categoria
+    // Agrupa as roupas por categoria (normalizada)
     val clothesByCategory = remember(userClothes) {
-        userClothes.groupBy { it.category ?: "Uncategorized" }
+        userClothes.groupBy {
+            (it.category ?: "OTHER").uppercase()
+        }
     }
 
     // Define a hierarquia baseada no número de linhas
     val categoryHierarchy = remember(numberOfRows) {
         when (numberOfRows) {
-            2 -> listOf("Top", "Bottom")
-            3 -> listOf("Top", "Bottom", "Shoes")
-            4 -> listOf("Hat", "Top", "Bottom", "Shoes")
-            else -> listOf("Top", "Bottom", "Shoes")
+            2 -> listOf("SHIRT", "PANTS")
+            3 -> listOf("SHIRT", "PANTS", "SHOES")
+            4 -> listOf("HEADWEAR", "SHIRT", "PANTS", "SHOES")
+            else -> listOf("SHIRT", "PANTS", "SHOES")
         }
     }
 
     // Cria as linhas de outfit seguindo a hierarquia
-    var outfitRows by remember {
-        mutableStateOf<List<OutfitRow>>(emptyList())
-    }
+    var outfitRows by remember { mutableStateOf<List<OutfitRow>>(emptyList()) }
 
-    // Atualiza as linhas quando as roupas carregarem ou número de linhas mudar
-    // substitua o LaunchedEffect que usa showGymOutfit por isto
-    LaunchedEffect(Unit) {
-        visible = true
-        viewModel.loadUserClothes()
+    // ✅ CORRIGIDO: Atualiza as linhas quando as roupas carregarem ou número de linhas mudar
+    LaunchedEffect(userClothes, numberOfRows, clothesByCategory) {
+        if (userClothes.isNotEmpty()) {
+            val newRows = categoryHierarchy.mapIndexed { index, category ->
+                val itemsForCategory = clothesByCategory[category] ?: emptyList()
+                OutfitRow(
+                    id = index,
+                    category = category,
+                    items = itemsForCategory,
+                    currentIndex = 0,
+                    isPinned = false
+                )
+            }
+            outfitRows = newRows
+        }
     }
-
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -268,12 +277,23 @@ fun StylingScreen(navController: NavController) {
                                         }
                                     }
                                 }
+                            } else if (outfitRows.isEmpty()) {
+                                // ✅ NOVO: Estado quando as roupas existem mas não há linhas
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = Color(0xFF121212))
+                                }
                             } else {
                                 // Mostra as roupas
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .weight(1f),
+                                        .weight(1f)
+                                        .padding(horizontal = 24.dp),
                                     verticalArrangement = Arrangement.SpaceEvenly,
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
@@ -411,7 +431,7 @@ fun ColumnScope.OutfitCarouselRow(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Add ${row.category}",
+                        text = "Add ${row.category.lowercase()}",
                         fontSize = 12.sp,
                         color = Color(0xFF808080)
                     )

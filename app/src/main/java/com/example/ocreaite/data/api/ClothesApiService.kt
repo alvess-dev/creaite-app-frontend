@@ -11,6 +11,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class ClothesApiService(private val tokenManager: TokenManager) {
@@ -24,6 +25,7 @@ class ClothesApiService(private val tokenManager: TokenManager) {
                 ignoreUnknownKeys = true
                 isLenient = true
                 prettyPrint = true
+                encodeDefaults = true
             })
         }
 
@@ -39,7 +41,7 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         data class Error(val message: String) : ClothesResult()
     }
 
-    // ✅ NOVO: Upload avançado com metadados
+    // ✅ Upload avançado com metadados
     suspend fun uploadAdvanced(
         imageBase64: String,
         name: String,
@@ -58,18 +60,20 @@ class ClothesApiService(private val tokenManager: TokenManager) {
                 return ClothesResult.Error("No authentication token")
             }
 
+            val requestBody = AdvancedUploadRequest(
+                imageBase64 = imageBase64,
+                name = name,
+                category = category,
+                color = color,
+                brand = brand,
+                description = description,
+                isPublic = true
+            )
+
             val response: ClothingItem = client.post("$BASE_URL/clothes/upload/advanced") {
                 contentType(ContentType.Application.Json)
                 header("Authorization", "Bearer $token")
-                setBody(mapOf(
-                    "imageBase64" to imageBase64,
-                    "name" to name,
-                    "category" to category,
-                    "color" to color,
-                    "brand" to brand,
-                    "description" to description,
-                    "isPublic" to true
-                ))
+                setBody(requestBody)
             }.body()
 
             Log.d(TAG, "✅ Advanced upload successful - ID: ${response.id}")
@@ -81,7 +85,26 @@ class ClothesApiService(private val tokenManager: TokenManager) {
         }
     }
 
-    // ✅ NOVO: Toggle favorito
+    // ✅ ADICIONADO: Método addClothing (alias para uploadAdvanced)
+    suspend fun addClothing(
+        imageBase64: String,
+        name: String,
+        category: String,
+        color: String,
+        brand: String,
+        description: String?
+    ): ClothesResult {
+        // Reutiliza o método uploadAdvanced
+        return uploadAdvanced(
+            imageBase64 = imageBase64,
+            name = name,
+            category = category,
+            color = color,
+            brand = brand,
+            description = description
+        )
+    }
+
     suspend fun toggleFavorite(id: String): ClothesResult {
         return try {
             Log.d(TAG, "=== Toggle Favorite ===")
@@ -252,47 +275,16 @@ class ClothesApiService(private val tokenManager: TokenManager) {
             ClothesResult.Error(e.message ?: "Delete failed")
         }
     }
-
-    // Função renomeada para evitar redeclaração — usa endpoint /clothes/add
-    suspend fun addClothing(
-        imageBase64: String,
-        name: String,
-        category: String,
-        color: String,
-        brand: String,
-        description: String?
-    ): ClothesResult {
-        return try {
-            Log.d(TAG, "=== Add Clothing (manual) ===")
-            Log.d(TAG, "Name: $name")
-            Log.d(TAG, "Category: $category")
-
-            val token = tokenManager.getAccessToken()
-            if (token == null) {
-                Log.e(TAG, "No token available")
-                return ClothesResult.Error("No authentication token")
-            }
-
-            val response: ClothingItem = client.post("$BASE_URL/clothes/add") {
-                contentType(ContentType.Application.Json)
-                header("Authorization", "Bearer $token")
-                setBody(mapOf(
-                    "name" to name,
-                    "category" to category,
-                    "color" to color,
-                    "brand" to brand,
-                    "clothingPictureUrl" to imageBase64,
-                    "description" to description,
-                    "isPublic" to true
-                ))
-            }.body()
-
-            Log.d(TAG, "✅ Add clothing successful - ID: ${response.id}")
-            ClothesResult.Success(response)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Add clothing failed: ${e.message}", e)
-            ClothesResult.Error(e.message ?: "Add clothing failed")
-        }
-    }
 }
+
+// ✅ Data class para serialização correta
+@Serializable
+data class AdvancedUploadRequest(
+    val imageBase64: String,
+    val name: String,
+    val category: String,
+    val color: String,
+    val brand: String,
+    val description: String?,
+    val isPublic: Boolean
+)
